@@ -12,34 +12,44 @@
 package programmingtheiot.gda.system;
 
 import java.lang.management.ManagementFactory;
+import java.lang.management.OperatingSystemMXBean;
+import java.util.logging.Logger;
 
 import programmingtheiot.common.ConfigConst;
 
-
 /**
- * Shell representation of class for student implementation.
- * 
+ * Task for retrieving CPU utilization telemetry from the host system.
  */
 public class SystemCpuUtilTask extends BaseSystemUtilTask
 {
 	// constructors
 	
 	/**
-	 * Default.
-	 * 
+	 * Default constructor that initializes the task with CPU identity constants.
 	 */
 	public SystemCpuUtilTask()
 	{
-		super(ConfigConst.NOT_SET, ConfigConst.DEFAULT_TYPE_ID);
+		// Use specific CPU constants instead of NOT_SET
+		super(ConfigConst.CPU_UTIL_NAME, ConfigConst.CPU_UTIL_TYPE);
 	}
 	
 	
 	// public methods
 	
+	/**
+	 * Overrides the base method to retrieve actual CPU load average.
+	 * @return float The system load average (percentage or -1.0 if not supported).
+	 */
 	@Override
 	public float getTelemetryValue()
 	{
-		return 0.0f;
+		// Use ManagementFactory to get the OperatingSystemMXBean
+		OperatingSystemMXBean mxBean = ManagementFactory.getOperatingSystemMXBean();
+		
+		// Retrieve the system load average
+		double cpuUtil = mxBean.getSystemLoadAverage();
+		
+		return (float) cpuUtil;
 	}
-	
-}
+} 
+

@@ -12,34 +12,52 @@
 package programmingtheiot.gda.system;
 
 import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
+import java.util.logging.Logger;
 
 import programmingtheiot.common.ConfigConst;
 
 /**
- * Shell representation of class for student implementation.
- * 
+ * Task for retrieving JVM memory utilization telemetry.
  */
 public class SystemMemUtilTask extends BaseSystemUtilTask
 {
 	// constructors
 	
 	/**
-	 * Default.
-	 * 
+	 * Default constructor that initializes the task with Memory identity constants.
 	 */
 	public SystemMemUtilTask()
 	{
-		super(ConfigConst.NOT_SET, ConfigConst.DEFAULT_TYPE_ID);
+		// Correctly pass constants to BaseSystemUtilTask
+		super(ConfigConst.MEM_UTIL_NAME, ConfigConst.MEM_UTIL_TYPE);
 	}
 	
 	
 	// public methods
 	
+	/**
+	 * Overrides the base method to calculate actual JVM heap memory utilization.
+	 * @return float The memory utilization percentage (0.0 to 100.0).
+	 */
 	@Override
 	public float getTelemetryValue()
 	{
-		return 0.0f;
+		// Retrieve memory usage data from the JVM
+		MemoryUsage memUsage = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage();
+		
+		double memUsed = (double) memUsage.getUsed();
+		double memMax  = (double) memUsage.getMax();
+		
+		// Log the raw values for debugging purposes
+		// Note: Ensure _Logger is 'protected' in BaseSystemUtilTask.java
+		_Logger.fine("Mem used: " + memUsed + "; Mem Max: " + memMax);
+		
+		// Calculate the utilization percentage: (Used / Max) * 100
+		double memUtil = (memUsed / memMax) * 100.0d;
+		
+		return (float) memUtil;
 	}
-	
-}
+} 
+
