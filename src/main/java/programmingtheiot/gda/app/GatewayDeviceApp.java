@@ -13,111 +13,92 @@ package programmingtheiot.gda.app;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.Map;
-import java.util.HashMap; 
 
 import programmingtheiot.gda.system.SystemPerformanceManager;
-import programmingtheiot.common.ConfigConst;
-import programmingtheiot.common.ConfigUtil;
-import programmingtheiot.gda.system.SystemPerformanceManager;
 
-/**
- * Main application wrapper for the Gateway Device App (GDA).
- */
-public class GatewayDeviceApp {
-	private static final Logger _Logger = 
+public class GatewayDeviceApp
+{
+	private static final Logger _Logger =
 		Logger.getLogger(GatewayDeviceApp.class.getName());
-	
-	private SystemPerformanceManager sysPerfManager;
 
-	/**
-	 * Default constructor (No-Argument). 
-	 * Required for Integration Tests.
-	 */
-	public GatewayDeviceApp() {
-		super();
-		_Logger.info("Initializing GDA...");
-		
-		// Initialize the performance manager
-		this.sysPerfManager = new SystemPerformanceManager();
+	private SystemPerformanceManager sysPerfMgr = null;
+
+	public GatewayDeviceApp()
+	{
+		this(null);
 	}
 
-	/**
-	 * Constructor with arguments.
-	 * Used by the main method to handle command line inputs.
-	 * * @param args Command line arguments.
-	 */
-	public GatewayDeviceApp(String[] args) {
-		this(); // Calls the no-arg constructor above to initialize sysPerfManager
+	public GatewayDeviceApp(String[] args)
+	{
+		super();
+
+		_Logger.info("Initializing GDA...");
+
+		this.sysPerfMgr = new SystemPerformanceManager();
+
 		parseArgs(args);
 	}
 
-	/**
-	 * Starts the GDA application and its managers.
-	 */
-	public void startApp() {
+	public void startApp()
+	{
 		_Logger.info("Starting GDA...");
+
 		try {
-			if (this.sysPerfManager != null) {
-				this.sysPerfManager.startManager(); //
-			}
+			this.sysPerfMgr.startManager();
 			_Logger.info("GDA started successfully.");
 		} catch (Exception e) {
-			_Logger.log(Level.SEVERE, "Failed to start GDA. Exiting.", e);
+			_Logger.log(Level.SEVERE, "Failed to start GDA.", e);
 			stopApp(-1);
 		}
 	}
 
-	/**
-	 * Stops the GDA application and its managers.
-	 * @param code The exit code.
-	 */
-	public void stopApp(int code) {
+	public void stopApp(int code)
+	{
 		_Logger.info("Stopping GDA...");
+
 		try {
-			if (this.sysPerfManager != null) {
-				this.sysPerfManager.stopManager(); //
+			if (this.sysPerfMgr != null) {
+				this.sysPerfMgr.stopManager();
 			}
 		} catch (Exception e) {
-			_Logger.log(Level.SEVERE, "Failed to cleanly stop GDA. Exiting.", e);
+			_Logger.log(Level.SEVERE, "Failed to stop GDA.", e);
 		}
-		_Logger.log(Level.INFO, "GDA stopped successfully with exit code {0}.", code);
-		
-		// Note: Avoid System.exit(0) if running within a test suite
-		if (code != 0) {
-			System.exit(code);
-		}
+
+		_Logger.info("GDA stopped successfully with exit code " + code + ".");
 	}
 
-	/**
-	 * Internal method to handle argument parsing.
-	 */
-	private Map<String, String> parseArgs(String[] args) {
-		Map<String, String> argMap = new HashMap<>();
-		if (args != null && args.length > 0) {
-			_Logger.info("Parsing " + args.length + " command line args.");
+	private void initConfig(String fileName)
+	{
+		if (fileName != null) {
+			_Logger.info("Attempting to load configuration: " + fileName);
 		} else {
-			_Logger.info("No command line args to parse.");
+			_Logger.info("Attempting to load configuration: Default.");
 		}
-		return argMap;
 	}
 
-	/**
-	 * Main entry point for the GDA.
-	 */
-	public static void main(String[] args) {
+	private void parseArgs(String[] args)
+	{
+		if (args == null || args.length == 0) {
+			_Logger.info("No command line args to parse.");
+		} else {
+			_Logger.info("Parsing command line args.");
+		}
+
+		initConfig(null);
+	}
+
+	public static void main(String[] args)
+	{
 		GatewayDeviceApp gwApp = new GatewayDeviceApp(args);
+
 		gwApp.startApp();
 
 		try {
-			// Sleep for 65 seconds to allow telemetry collection
 			Thread.sleep(65000L);
 		} catch (InterruptedException e) {
-			_Logger.log(Level.WARNING, "GDA thread interrupted.", e);
+			// ignore
 		}
 
 		gwApp.stopApp(0);
 	}
-} 
-
-
+}

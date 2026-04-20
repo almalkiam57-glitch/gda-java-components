@@ -11,44 +11,33 @@
 
 package programmingtheiot.gda.system;
 
-import java.util.logging.Logger;
 import programmingtheiot.common.ConfigConst;
 
-/**
- * Base abstract class for all system utility tasks in the GDA.
- */
 public abstract class BaseSystemUtilTask
 {
-    // CHANGE THIS LINE: from private to protected
-    protected static final Logger _Logger =
-        Logger.getLogger(BaseSystemUtilTask.class.getName());
-    
-    // private variables stay private
-    private String name   = ConfigConst.NOT_SET;
-    private int    typeID = ConfigConst.DEFAULT_SENSOR_TYPE;
-    
-    // constructors
-    public BaseSystemUtilTask(String name, int typeID)
-    {
-        super();
-        
-        if (name != null) {
-            this.name = name;
-        }
-        
-        this.typeID = typeID;
-    }
-    
-    // public methods
-    public String getName()
-    {
-        return this.name;
-    }
-    
-    public int getTypeID()
-    {
-        return this.typeID;
-    }
-    
-    public abstract float getTelemetryValue();
-} 
+	private String name = ConfigConst.NOT_SET;
+	private int typeID = ConfigConst.DEFAULT_TYPE_ID;
+
+	public BaseSystemUtilTask(String name, int typeID)
+	{
+		super();
+
+		if (name != null) {
+			this.name = name;
+		}
+
+		this.typeID = typeID;
+	}
+
+	public String getName()
+	{
+		return this.name;
+	}
+
+	public int getTypeID()
+	{
+		return this.typeID;
+	}
+
+	public abstract float getTelemetryValue();
+}
