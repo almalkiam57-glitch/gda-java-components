@@ -15,95 +15,166 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.logging.Logger;
 
 import com.google.gson.Gson;
 
-/**
- * Shell representation of class for student implementation.
- *
- */
+import programmingtheiot.common.ConfigConst;
+
 public class DataUtil
 {
 	// static
-	
+
+	private static final Logger _Logger =
+		Logger.getLogger(DataUtil.class.getName());
+
 	private static final DataUtil _Instance = new DataUtil();
 
-	/**
-	 * Returns the Singleton instance of this class.
-	 * 
-	 * @return ConfigUtil
-	 */
 	public static final DataUtil getInstance()
 	{
 		return _Instance;
 	}
-	
-	
-	// private var's
-	
-	
+
+
 	// constructors
-	
-	/**
-	 * Default (private).
-	 * 
-	 */
+
 	private DataUtil()
 	{
 		super();
 	}
-	
-	
+
+
 	// public methods
-	
+
 	public String actuatorDataToJson(ActuatorData actuatorData)
 	{
-		return null;
+		String jsonData = null;
+
+		if (actuatorData != null) {
+			Gson gson = new Gson();
+			jsonData = gson.toJson(actuatorData);
+			_Logger.info("ActuatorData to JSON: " + jsonData);
+		}
+
+		return jsonData;
 	}
-	
+
 	public String actuatorDataToTimeAndValueJson(ActuatorData actuatorData)
 	{
-		return null;
+		String jsonData = null;
+
+		if (actuatorData != null) {
+			Gson gson = new Gson();
+			jsonData = gson.toJson(actuatorData);
+			_Logger.info("ActuatorData to TimeAndValue JSON: " + jsonData);
+		}
+
+		return jsonData;
 	}
-	
+
 	public String sensorDataToJson(SensorData sensorData)
 	{
-		return null;
+		String jsonData = null;
+
+		if (sensorData != null) {
+			Gson gson = new Gson();
+			jsonData = gson.toJson(sensorData);
+			_Logger.info("SensorData to JSON: " + jsonData);
+		}
+
+		return jsonData;
 	}
-	
+
 	public String sensorDataToTimeAndValueJson(SensorData sensorData)
 	{
-		return null;
+		String jsonData = null;
+
+		if (sensorData != null) {
+			Gson gson = new Gson();
+			jsonData = gson.toJson(sensorData);
+			_Logger.info("SensorData to TimeAndValue JSON: " + jsonData);
+		}
+
+		return jsonData;
 	}
-	
+
 	public String systemPerformanceDataToJson(SystemPerformanceData sysPerfData)
 	{
-		return null;
+		String jsonData = null;
+
+		if (sysPerfData != null) {
+			Gson gson = new Gson();
+			jsonData = gson.toJson(sysPerfData);
+			_Logger.info("SystemPerformanceData to JSON: " + jsonData);
+		}
+
+		return jsonData;
 	}
-	
+
 	public String systemStateDataToJson(SystemStateData sysStateData)
 	{
-		return null;
+		String jsonData = null;
+
+		if (sysStateData != null) {
+			Gson gson = new Gson();
+			jsonData = gson.toJson(sysStateData);
+			_Logger.info("SystemStateData to JSON: " + jsonData);
+		}
+
+		return jsonData;
 	}
-	
+
 	public ActuatorData jsonToActuatorData(String jsonData)
 	{
-		return null;
+		ActuatorData data = null;
+
+		if (jsonData != null && jsonData.trim().length() > 0) {
+			Gson gson = new Gson();
+			data = gson.fromJson(jsonData, ActuatorData.class);
+			_Logger.info("JSON to ActuatorData: " + data);
+		}
+
+		return data;
 	}
-	
+
 	public SensorData jsonToSensorData(String jsonData)
 	{
-		return null;
+		SensorData data = null;
+
+		if (jsonData != null && jsonData.trim().length() > 0) {
+			Gson gson = new Gson();
+			data = gson.fromJson(jsonData, SensorData.class);
+			_Logger.info("JSON to SensorData: " + data);
+		}
+
+		return data;
 	}
-	
+
 	public SystemPerformanceData jsonToSystemPerformanceData(String jsonData)
 	{
-		return null;
+		SystemPerformanceData data = null;
+
+		if (jsonData != null && jsonData.trim().length() > 0) {
+			Gson gson = new Gson();
+			data = gson.fromJson(jsonData, SystemPerformanceData.class);
+			_Logger.info("JSON to SystemPerformanceData: " + data);
+		}
+
+		return data;
 	}
-	
+
 	public SystemStateData jsonToSystemStateData(String jsonData)
 	{
-		return null;
+		SystemStateData data = null;
+
+		if (jsonData != null && jsonData.trim().length() > 0) {
+			Gson gson = new Gson();
+			data = gson.fromJson(jsonData, SystemStateData.class);
+			_Logger.info("JSON to SystemStateData: " + data);
+		}
+
+		return data;
 	}
-	
-}
+
+} 
+

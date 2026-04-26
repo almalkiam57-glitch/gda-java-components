@@ -24,60 +24,113 @@ import programmingtheiot.common.ResourceNameEnum;
 import programmingtheiot.data.*;
 import programmingtheiot.gda.connection.*;
 
-/**
- * This test case class contains very basic integration tests for
- * MqttClientControlPacketTest. It should not be considered complete,
- * but serve as a starting point for the student implementing
- * additional functionality within their Programming the IoT
- * environment.
- *
- */
 public class MqttClientControlPacketTest
 {
-	// static
-	
 	private static final Logger _Logger =
 		Logger.getLogger(MqttClientControlPacketTest.class.getName());
-	
-	
-	// member var's
-	
+
 	private MqttClientConnector mqttClient = null;
-	
-	
-	// test setup methods
-	
+
 	@Before
 	public void setUp() throws Exception
 	{
 		this.mqttClient = new MqttClientConnector();
 	}
-	
+
 	@After
 	public void tearDown() throws Exception
 	{
 	}
-	
-	// test methods
-	
+
+	// Generates: CONNECT, CONNACK, DISCONNECT
 	@Test
 	public void testConnectAndDisconnect()
 	{
-		// TODO: implement this test
+		assertTrue(this.mqttClient.connectClient());
+		assertFalse(this.mqttClient.connectClient());
+
+		try {
+			Thread.sleep(2000);
+		} catch (Exception e) {
+			// ignore
+		}
+
+		assertTrue(this.mqttClient.disconnectClient());
+		assertFalse(this.mqttClient.disconnectClient());
 	}
-	
+
+	// Generates: CONNECT, CONNACK, PINGREQ, PINGRESP, DISCONNECT
 	@Test
 	public void testServerPing()
 	{
-		// TODO: implement this test
+		int keepAlive = ConfigUtil.getInstance().getInteger(
+			ConfigConst.MQTT_GATEWAY_SERVICE,
+			ConfigConst.KEEP_ALIVE_KEY,
+			ConfigConst.DEFAULT_KEEP_ALIVE);
+
+		assertTrue(this.mqttClient.connectClient());
+
+		// Wait long enough to trigger PINGREQ / PINGRESP
+		try {
+			Thread.sleep(keepAlive * 1000 + 5000);
+		} catch (Exception e) {
+			// ignore
+		}
+
+		assertTrue(this.mqttClient.disconnectClient());
 	}
-	
+
+	// Generates: CONNECT, CONNACK,
+	//            SUBSCRIBE, SUBACK,
+	//            PUBLISH, PUBACK (QoS 1),
+	//            PUBLISH, PUBREC, PUBREL, PUBCOMP (QoS 2),
+	//            UNSUBSCRIBE, UNSUBACK,
+	//            DISCONNECT
 	@Test
 	public void testPubSub()
 	{
-		// TODO: implement this test
-		// 
-		// IMPORTANT: be sure to use QoS 1 and 2 to see ALL control packets
+		assertTrue(this.mqttClient.connectClient());
+
+		// Subscribe to topic
+		assertTrue(this.mqttClient.subscribeToTopic(ResourceNameEnum.GDA_MGMT_STATUS_MSG_RESOURCE, 0));
+
+		try {
+			Thread.sleep(2000);
+		} catch (Exception e) {
+			// ignore
+		}
+
+		// QoS 1 - generates PUBLISH + PUBACK
+		assertTrue(this.mqttClient.publishMessage(
+			ResourceNameEnum.GDA_MGMT_STATUS_MSG_RESOURCE,
+			"Test QoS 1 message", 1));
+
+		try {
+			Thread.sleep(2000);
+		} catch (Exception e) {
+			// ignore
+		}
+
+		// QoS 2 - generates PUBLISH + PUBREC + PUBREL + PUBCOMP
+		assertTrue(this.mqttClient.publishMessage(
+			ResourceNameEnum.GDA_MGMT_STATUS_MSG_RESOURCE,
+			"Test QoS 2 message", 2));
+
+		try {
+			Thread.sleep(2000);
+		} catch (Exception e) {
+			// ignore
+		}
+
+		// Unsubscribe - generates UNSUBSCRIBE + UNSUBACK
+		assertTrue(this.mqttClient.unsubscribeFromTopic(ResourceNameEnum.GDA_MGMT_STATUS_MSG_RESOURCE));
+
+		try {
+			Thread.sleep(2000);
+		} catch (Exception e) {
+			// ignore
+		}
+
+		assertTrue(this.mqttClient.disconnectClient());
 	}
-	
-}
+} 

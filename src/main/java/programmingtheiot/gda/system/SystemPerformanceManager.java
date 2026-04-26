@@ -18,6 +18,9 @@ import java.util.logging.Logger;
 
 import programmingtheiot.common.ConfigConst;
 import programmingtheiot.common.ConfigUtil;
+import programmingtheiot.common.IDataMessageListener;
+import programmingtheiot.common.ResourceNameEnum;
+import programmingtheiot.data.SystemPerformanceData;
 
 public class SystemPerformanceManager
 {
@@ -33,6 +36,9 @@ public class SystemPerformanceManager
 	private Runnable taskRunner = null;
 	private boolean isStarted = false;
 
+	private String locationID = ConfigConst.NOT_SET;
+	private IDataMessageListener dataMsgListener = null;
+
 	public SystemPerformanceManager()
 	{
 		this.pollRate =
@@ -44,6 +50,12 @@ public class SystemPerformanceManager
 		if (this.pollRate <= 0) {
 			this.pollRate = ConfigConst.DEFAULT_POLL_CYCLES;
 		}
+
+		this.locationID =
+			ConfigUtil.getInstance().getProperty(
+				ConfigConst.GATEWAY_DEVICE,
+				ConfigConst.DEVICE_LOCATION_ID_KEY,
+				ConfigConst.NOT_SET);
 
 		this.schedExecSvc   = Executors.newScheduledThreadPool(1);
 		this.sysCpuUtilTask = new SystemCpuUtilTask();
@@ -59,7 +71,24 @@ public class SystemPerformanceManager
 		float cpuUtil = this.sysCpuUtilTask.getTelemetryValue();
 		float memUtil = this.sysMemUtilTask.getTelemetryValue();
 
-		_Logger.info("Handle telemetry results: cpuUtil=" + cpuUtil + ", memUtil=" + memUtil);
+		_Logger.info("CPU utilization: " + cpuUtil + ", Mem utilization: " + memUtil);
+
+		SystemPerformanceData spd = new SystemPerformanceData();
+		spd.setLocationID(this.locationID);
+		spd.setCpuUtilization(cpuUtil);
+		spd.setMemoryUtilization(memUtil);
+
+		if (this.dataMsgListener != null) {
+			this.dataMsgListener.handleSystemPerformanceMessage(
+				ResourceNameEnum.GDA_SYSTEM_PERF_MSG_RESOURCE, spd);
+		}
+	}
+
+	public void setDataMessageListener(IDataMessageListener listener)
+	{
+		if (listener != null) {
+			this.dataMsgListener = listener;
+		}
 	}
 
 	public void startManager()
@@ -87,4 +116,5 @@ public class SystemPerformanceManager
 
 		_Logger.info("SystemPerformanceManager is stopped.");
 	}
-}
+} 
+
