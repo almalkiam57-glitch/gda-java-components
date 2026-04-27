@@ -115,7 +115,7 @@ mvn test -Dtest=MqttClientControlPacketTest
 | 14 | PINGREQ | - |
 | 15 | PINGRESP | - |
 
-[Wireshark screenshots included in submission]
+
 
 ## Summary
 This lab added full MQTT pub/sub capability to the GDA, implemented the
