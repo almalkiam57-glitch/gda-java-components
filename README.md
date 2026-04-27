@@ -1,96 +1,126 @@
-# Programming the IoT - GDA Java Components
-This is the source repository for the Java components related to my Programming the Internet of Things book and Connected Devices IoT course. These are shell wrappers ONLY and are not a solution set (which is a separate repository, not yet released). For convenience to the reader, some basic functionality has already been implemented (such as configuration logic, consts, interfaces, a simple certificate file load utility, and test cases).
+=========================
+📄 GDA README — Lab Module 07
+=========================
+## Overview
+In Lab Module 07, I implemented a full MQTT publish/subscribe client for the
+Gateway Device Application (GDA) using the Paho MQTT Java library, wired it
+into the DeviceDataManager, and verified all 14 MQTT 3.1.1 Control Packet
+types using Wireshark.
 
-The code in this repository is largely comprised of shell classes that are designed to be implemented by the reader and are NOT solutions. These shell classes and their relationships respresent a notional design that aligns with the requirements listed in [Programming the IoT Requirements](https://github.com/orgs/programming-the-iot/projects/1). These requirements encapsulate the programming exercises presented in my book [Programming the Internet of Things: An Introduction to Building Integrated, Device to Cloud IoT Solutions](https://learning.oreilly.com/library/view/programming-the-internet/9781492081401).
+## What I Implemented
+I implemented/updated the following components:
+- MqttClientConnector
+- DeviceDataManager
+- GatewayDeviceApp
+- MqttClientControlPacketTest
 
-## Links, Exercises, Updates, Errata, and Clarifications
+## How It Works
 
-Please see the following links to access exercises, errata / clarifications, and the e-book:
- - [Programming the IoT Kanban Board](https://github.com/orgs/programming-the-iot/projects/1)
- - [Errata and Clarifications](https://labbenchstudios.com/programming-the-iot-book/programming-the-iot-1st-edition/)
- - [Programming the Internet of Things Book](https://learning.oreilly.com/library/view/programming-the-internet/9781492081401/)
+### MqttClientConnector
+- Implements the `IPubSubClient` and `MqttCallbackExtended` interfaces.
+- Reads MQTT broker host, port, keepAlive, and useAsyncClient from
+  `PiotConfig.props` via `ConfigUtil`.
+- Generates a unique `clientID` using `MqttClient.generateClientId()`.
+- `connectClient()` creates a Paho `MqttClient`, sets the callback to
+  `this`, and connects to the broker using `MqttConnectOptions`.
+- `disconnectClient()` disconnects cleanly from the broker.
+- `connectComplete()`, `connectionLost()`, `deliveryComplete()`,
+  `messageArrived()` callbacks log all MQTT events.
+- `publishMessage()` validates the topic and QoS, builds an
+  `MqttMessage`, and publishes it to the broker.
+- `subscribeToTopic()` validates the topic and QoS and subscribes
+  to the given resource.
+- `unsubscribeFromTopic()` unsubscribes from the given resource.
+- `setDataMessageListener()` registers an `IDataMessageListener` for
+  incoming message callbacks.
 
-## How to use this repository
-If you're reading [Programming the Internet of Things: An Introduction to Building Integrated, Device to Cloud IoT Solutions](https://learning.oreilly.com/library/view/programming-the-internet/9781492081401), you'll see a tie-in with the exercises described in each chapter and this repository. Most of the code in the main src tree is NOT implemented by design. It's intended for you - as the reader of my book (and possibly a student in one of my IoT courses) - to implement by filling in the implementation details as you work through each exercise.
+### DeviceDataManager
+- Updated `initManager()` to create an `MqttClientConnector` instance
+  if `enableMqttClient` is true, and registers itself as the
+  `IDataMessageListener`.
+- `startManager()` calls `mqttClient.connectClient()` and subscribes
+  to `GDA_MGMT_STATUS_MSG_RESOURCE`, `CDA_ACTUATOR_RESPONSE_RESOURCE`,
+  `CDA_SENSOR_MSG_RESOURCE`, and `CDA_SYSTEM_PERF_MSG_RESOURCE`.
+- `stopManager()` unsubscribes from all topics and calls
+  `mqttClient.disconnectClient()`.
 
-A solution set is available, although I haven't yet released it. Stay tuned for updates on this topic.
+### GatewayDeviceApp
+- Updated to use `DeviceDataManager` instead of `SystemPerformanceManager`
+  directly, so the full GDA application now starts and stops the MQTT
+  client through `DeviceDataManager`.
 
-## This repository aligns to exercises in Programming the Internet of Things
-These components are all written in Java 11 (or higher), and correlate to the exercises designed for the Gateway Device Application (GDA) specified in my book [Programming the Internet of Things: An Introduction to Building Integrated, Device to Cloud IoT Solutions](https://learning.oreilly.com/library/view/programming-the-internet/9781492081401).
+### MqttClientControlPacketTest
+- Custom test class created to generate all 14 MQTT 3.1.1 Control Packets.
+- `testConnectAndDisconnect()` generates CONNECT, CONNACK, and DISCONNECT
+  by connecting and disconnecting from the broker.
+- `testServerPing()` sustains the connection long enough to trigger
+  the PINGREQ and PINGRESP keepAlive packets.
+- `testPubSub()` uses both QoS 1 and QoS 2 to generate SUBSCRIBE,
+  SUBACK, PUBLISH, PUBACK, PUBREC, PUBREL, PUBCOMP, UNSUBSCRIBE,
+  and UNSUBACK packets.
 
-## How to navigate the directory structure for this repository
-This repository is comprised of the following top level paths:
-- [config](https://github.com/programming-the-iot/gda-java-components/tree/default/config): Contains basic configuration file(s).
-- [src](https://github.com/programming-the-iot/gda-java-components/tree/default/src): Contains the following source trees:
-  - [src/main/java](https://github.com/programming-the-iot/gda-java-components/tree/default/src/main/java): The main source tree for gda-java-components. Keep in mind that most of these classes are shell representations ONLY and must be implemented as part of the exercises referenced above.
-  - [src/test/java](https://github.com/programming-the-iot/gda-java-components/tree/default/src/test/java): The test source tree for gda-java-components. These are designed to perform very basic unit and integration testing of the implementation of the exercises referenced above. This tree is sectioned by part - part01, part02, part03, and part04 - which correspond to the structure of Programming the Internet of Things.
+## Testing
 
-Here are some other files at the top level that are important to review:
-- [pom.xml](https://github.com/programming-the-iot/gda-java-components/blob/default/pom.xml): The Maven project configuration file, with relevant depedencies, etc.
-- [README.md](https://github.com/programming-the-iot/gda-java-components/blob/default/README.md): This README.me file.
-- [LICENSE](https://github.com/programming-the-iot/gda-java-components/blob/default/LICENSE): The repository's LICENSE file.
+```bash
+# Setup
+cd ~/IoT_labs_TELE6530/gda-java-components
 
-Lastly, here are some 'dot' ('.{filename}') files pertaining to dev environment setup that you may find useful (or not - if so, just delete them after cloning the repo):
-- [.classpath](https://github.com/programming-the-iot/gda-java-components/blob/default/.classpath): The Eclipse IDE CLASSPATH configuration file for your Java environment that may / may not be useful for your own cloned instance.
-- [.gitignore](https://github.com/programming-the-iot/gda-java-components/blob/default/.gitignore): The obligatory .gitignore that you should probably keep in place, with any additions that are relevant for your own cloned instance.
-- [.project](https://github.com/programming-the-iot/gda-java-components/blob/default/.project): The Eclipse IDE project configuration file that may / may not be useful for your own cloned instance. Note that using this file to help create your Eclipse IDE project will result in the project name 'piot-gda-java-components' (which can be changed, of course).
-- [.settings/org.eclipse.jdt.core.prefs](https://github.com/programming-the-iot/gda-java-components/blob/default/.settings/org.eclipse.jdt.core.prefs): The Eclipse IDE settings file, which is only included to assist with setting up an Eclipse dev environment related to my IoT courses and book exercises, which may / may not be useful for your own cloned instance.
+# Terminal 1 - Start Mosquitto broker
+sudo systemctl start mosquitto
 
-NOTE: The directory structure and all files are subject to change based on feedback I receive from readers of my book and students in my IoT class, as well as improvements I find to be helpful for overall repo betterment.
+# PIOT-GDA-07-001 & 07-002 - Connect and Disconnect
+mvn test -Dtest=MqttClientConnectorTest#testConnectAndDisconnect
 
-# Other things to know
+# PIOT-GDA-07-003 - Publish and Subscribe
+mvn test -Dtest=MqttClientConnectorTest#testPublishAndSubscribe
 
-## Pull requests
-PR's are disabled while the codebase is being developed.
+# PIOT-GDA-07-004 - DeviceDataManager with MQTT
+# Terminal 1: mosquitto already running
+# Terminal 2:
+java -jar target/gateway-device-app-0.0.1-jar-with-dependencies.jar
+# Terminal 3:
+mvn test -Dtest=MqttClientConnectorTest#testPublishAndSubscribe
 
-## Updates
-Much of this repository, and in particular unit and integration tests, will continue to evolve, so please check back regularly for potential updates. Please note that API changes can - and likely will - occur at any time.
+# PIOT-STU-07-002 - Wireshark capture of all 14 MQTT 3.1.1 Control Packets
+wireshark &
+mvn test -Dtest=MqttClientControlPacketTest
+```
 
-# REFERENCES
-This repository has external dependencies on other open source projects. I'm grateful to the open source community and authors / maintainers of the following libraries:
+### Tests Passed
 
-Lab Module Library References (not all are required for each lab module):
+| Task | Test | Result | Time |
+|------|------|--------|------|
+| PIOT-GDA-07-001 & 07-002 | testConnectAndDisconnect | ✅ PASSED | 67.30s |
+| PIOT-GDA-07-003 | testPublishAndSubscribe | ✅ PASSED | 98.93s |
+| PIOT-GDA-07-004 | testPublishAndSubscribe (with GDA app) | ✅ PASSED | 99.14s |
+| PIOT-STU-07-002 | testConnectAndDisconnect, testServerPing, testPubSub | ✅ PASSED | 78.31s |
 
-- [aws-iot-device-sdk-java](https://github.com/aws/aws-iot-device-sdk-java)
-  - Reference: AWS. AWS IoT Device SDK (Java). (2023) [Online]. Available: https://github.com/aws/aws-iot-device-sdk-java.
-- [aws-iot-device-sdk-java-samples](https://github.com/aws/aws-iot-device-sdk-java)
-  - Reference: AWS. AWS IoT Device SDK Samples (Java). (2023) [Online]. Available: https://github.com/aws/aws-iot-device-sdk-java.
-- [azure-iot-device-client](https://github.com/Azure/azure-iot-sdk-java)
-  - Reference: Microsoft. Azure IoT Device Client (Java). (2023) [Online]. Available: https://github.com/Azure/azure-iot-sdk-java.
-- [californium-core](https://github.com/eclipse/californium)
-  - Reference: Eclipse Foundation, Inc. Californium (Cf) - CoAP for Java. (2020) [Online]. Available. https://github.com/eclipse/californium.
-- [californium/scandium-core](https://github.com/eclipse/californium/tree/master/scandium-core)
-  - Reference: Eclipse Foundation, Inc. Scandium (Sc) - Security for Californium. (2021) [Online]. Available. https://github.com/eclipse/californium/tree/master/scandium-core.
-- [commons-cli](https://commons.apache.org/proper/commons-cli/)
-  - Reference: The Apache Software Foundation. Commons CLI. (2019) [Online]. Available. https://commons.apache.org/proper/commons-cli/.
-- [commons-configuration2](commons.apache.org/proper/commons-configuration/)
-  - Reference: The Apache Software Foundation. Commons Configuration 2. (2023) [Online]. Available: https://commons.apache.org/proper/commons-configuration/.
-- [org.eclipse.paho.client.mqttv3](https://www.eclipse.org/paho/)
-  - Reference: Eclipse Foundation, Inc. Eclipse Paho Java Client. (2020) [Online]. Available: https://github.com/eclipse/paho.mqtt.java.
-- [org.eclipse.paho.mqttv5.client](https://www.eclipse.org/paho/)
-  - Reference: Eclipse Foundation, Inc. Eclipse Paho Java Client. (2023) [Online]. Available: https://github.com/eclipse/paho.mqtt.java.
-- [gson](https://github.com/google/gson)
-  - Reference: Google. Gson. (2008) [Online]. Available: https://github.com/google/gson.
-- [influxdb-client-java](https://github.com/influxdata/influxdb-client-java)
-  - Reference: Influx Data, Inc. Influx DB. (2023) [Online]. Available: https://github.com/influxdata/influxdb-client-java.
-- [jakarta.mail-api](https://jakartaee.github.io/mail-api/)
-  - Reference: Eclipse Foundation, Inc. Jakarta Mail. (2023) [Online]. Available: https://github.com/jakartaee/mail-api.
-- [jedis](https://github.com/redis/jedis)
-  - Reference: J. Leibiusky. Jedis. (2020) [Online]. Available: https://github.com/redis/jedis.
-- [junit](https://github.com/junit-team/junit4/)
-  - Reference: JUnit. JUnit 4. (2020) [Online]. Available: https://junit.org/junit4/.
+### Wireshark — All 14 MQTT 3.1.1 Control Packets Captured
 
-NOTE: This list will be updated as other libraries / dependencies are incorporated.
+| # | Packet Type | QoS |
+|---|------------|-----|
+| 1 | CONNECT | - |
+| 2 | CONNACK | - |
+| 3 | DISCONNECT | - |
+| 4 | SUBSCRIBE | - |
+| 5 | SUBACK | - |
+| 6 | PUBLISH | QoS 1 |
+| 7 | PUBACK | QoS 1 |
+| 8 | PUBLISH | QoS 2 |
+| 9 | PUBREC | QoS 2 |
+| 10 | PUBREL | QoS 2 |
+| 11 | PUBCOMP | QoS 2 |
+| 12 | UNSUBSCRIBE | - |
+| 13 | UNSUBACK | - |
+| 14 | PINGREQ | - |
+| 15 | PINGRESP | - |
 
-# FAQ
-For typical questions (and answers) to the repositories of the Programming the IoT project, please see the [FAQ](https://github.com/programming-the-iot/book-exercise-tasks/blob/default/FAQ.md).
+[Wireshark screenshots included in submission]
 
-# IMPORTANT NOTES
-This code base is under active development.
+## Summary
+This lab added full MQTT pub/sub capability to the GDA, implemented the
+MqttClientConnector with all required callbacks in Java, wired it into
+DeviceDataManager, updated GatewayDeviceApp to use DeviceDataManager,
+and verified all 14 MQTT 3.1.1 Control Packet types using Wireshark
+with both QoS 1 and QoS 2.
 
-If  any  code  samples  or  other  technology  this  work  contains, describes, and / or is  subject  to  open  source licenses  or  the  intellectual  property  rights  of  others,  it  is  your  responsibility  to  ensure  that  your  use thereof complies with such licenses and/or rights.
-
-# LICENSE
-Please see [LICENSE](https://github.com/programming-the-iot/gda-java-components/blob/default/LICENSE) if you plan to use this code.
-
-Please refer to the referenced libraries for their respective licenses.
