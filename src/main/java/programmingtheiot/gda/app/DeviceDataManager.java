@@ -124,6 +124,9 @@ public class DeviceDataManager implements IDataMessageListener
 	{
 		if (data != null) {
 			_Logger.info("Handling actuator command request: " + data.getName());
+
+			handleIncomingDataAnalysis(resourceName, data);
+
 			return true;
 		} else {
 			return false;
@@ -175,11 +178,18 @@ public class DeviceDataManager implements IDataMessageListener
 
 	public void setActuatorDataListener(String name, IActuatorDataListener listener)
 	{
+		if (listener != null) {
+			this.actuatorDataListener = listener;
+		}
 	}
 
 	public void startManager()
 	{
 		_Logger.info("Starting DeviceDataManager...");
+
+		if (this.sysPerfMgr != null) {
+			this.sysPerfMgr.startManager();
+		}
 
 		if (this.mqttClient != null) {
 			if (this.mqttClient.connectClient()) {
@@ -196,8 +206,12 @@ public class DeviceDataManager implements IDataMessageListener
 			}
 		}
 
-		if (this.sysPerfMgr != null) {
-			this.sysPerfMgr.startManager();
+		if (this.enableCoapServer && this.coapServer != null) {
+			if (this.coapServer.startServer()) {
+				_Logger.info("CoAP server started.");
+			} else {
+				_Logger.severe("Failed to start CoAP server. Check log file for details.");
+			}
 		}
 	}
 
@@ -219,6 +233,14 @@ public class DeviceDataManager implements IDataMessageListener
 				_Logger.info("Successfully disconnected MQTT client from broker.");
 			} else {
 				_Logger.severe("Failed to disconnect MQTT client from broker.");
+			}
+		}
+
+		if (this.enableCoapServer && this.coapServer != null) {
+			if (this.coapServer.stopServer()) {
+				_Logger.info("CoAP server stopped.");
+			} else {
+				_Logger.severe("Failed to stop CoAP server. Check log file for details.");
 			}
 		}
 	}
@@ -245,7 +267,7 @@ public class DeviceDataManager implements IDataMessageListener
 		}
 
 		if (this.enableCoapServer) {
-			// TODO: implement this in Lab Module 8
+			this.coapServer = new CoapServerGateway(this);
 		}
 
 		if (this.enableCloudClient) {
@@ -259,7 +281,15 @@ public class DeviceDataManager implements IDataMessageListener
 
 	private void handleIncomingDataAnalysis(ResourceNameEnum resourceName, ActuatorData data)
 	{
-		_Logger.fine("Handling incoming ActuatorData analysis: " + resourceName);
+		_Logger.info("Analyzing incoming actuator data: " + data.getName());
+
+		if (data.isResponseFlagEnabled()) {
+			// TODO: implement this
+		} else {
+			if (this.actuatorDataListener != null) {
+				this.actuatorDataListener.onActuatorDataUpdate(data);
+			}
+		}
 	}
 
 	private void handleIncomingDataAnalysis(ResourceNameEnum resourceName, SystemStateData data)
@@ -273,3 +303,5 @@ public class DeviceDataManager implements IDataMessageListener
 		return false;
 	}
 } 
+
+

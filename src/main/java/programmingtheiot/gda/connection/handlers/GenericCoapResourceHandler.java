@@ -15,6 +15,7 @@ import java.util.logging.Logger;
 
 import org.eclipse.californium.core.CoapResource;
 import org.eclipse.californium.core.coap.CoAP.ResponseCode;
+import org.eclipse.californium.core.coap.MediaTypeRegistry;
 import org.eclipse.californium.core.server.resources.CoapExchange;
 
 import programmingtheiot.common.ConfigConst;
@@ -22,68 +23,64 @@ import programmingtheiot.common.ConfigUtil;
 import programmingtheiot.common.IDataMessageListener;
 import programmingtheiot.common.ResourceNameEnum;
 
-
-/**
- * Shell representation of class for student implementation.
- *
- */
 public class GenericCoapResourceHandler extends CoapResource
 {
 	// static
-	
+
 	private static final Logger _Logger =
 		Logger.getLogger(GenericCoapResourceHandler.class.getName());
-	
+
 	// params
-	
-	
+
+	private IDataMessageListener dataMsgListener = null;
+
 	// constructors
-	
-	/**
-	 * Constructor.
-	 * 
-	 * @param resource Basically, the path (or topic)
-	 */
+
 	public GenericCoapResourceHandler(ResourceNameEnum resource)
 	{
 		this(resource.getResourceName());
 	}
-	
-	/**
-	 * Constructor.
-	 * 
-	 * @param resourceName The name of the resource.
-	 */
+
 	public GenericCoapResourceHandler(String resourceName)
 	{
 		super(resourceName);
 	}
-	
-	
+
+
 	// public methods
-	
+
 	@Override
 	public void handleDELETE(CoapExchange context)
 	{
+		_Logger.info("DELETE request received for resource: " + this.getName());
+		context.respond(ResponseCode.DELETED);
 	}
-	
+
 	@Override
 	public void handleGET(CoapExchange context)
 	{
+		_Logger.info("GET request received for resource: " + this.getName());
+		context.respond(ResponseCode.CONTENT, "GET OK: " + this.getName(), MediaTypeRegistry.TEXT_PLAIN);
 	}
-	
+
 	@Override
 	public void handlePOST(CoapExchange context)
 	{
+		_Logger.info("POST request received for resource: " + this.getName());
+		context.respond(ResponseCode.CHANGED);
 	}
-	
+
 	@Override
 	public void handlePUT(CoapExchange context)
 	{
+		_Logger.info("PUT request received for resource: " + this.getName());
+		context.respond(ResponseCode.CHANGED);
 	}
-	
+
 	public void setDataMessageListener(IDataMessageListener listener)
 	{
+		if (listener != null) {
+			this.dataMsgListener = listener;
+		}
 	}
-	
-}
+} 
