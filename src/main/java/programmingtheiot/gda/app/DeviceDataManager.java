@@ -2,11 +2,6 @@
  * This class is part of the Programming the Internet of Things
  * project, and is available via the MIT License, which can be
  * found in the LICENSE file at the top level of this repository.
- * 
- * You may find it more helpful to your design to adjust the
- * functionality, constants and interfaces (if there are any)
- * provided within in order to meet the needs of your specific
- * Programming the Internet of Things project.
  */
 
 package programmingtheiot.gda.app;
@@ -27,6 +22,7 @@ import programmingtheiot.data.SystemPerformanceData;
 import programmingtheiot.data.SystemStateData;
 
 import programmingtheiot.gda.connection.CloudClientConnector;
+import programmingtheiot.gda.connection.CoapClientConnector;
 import programmingtheiot.gda.connection.CoapServerGateway;
 import programmingtheiot.gda.connection.IPersistenceClient;
 import programmingtheiot.gda.connection.IPubSubClient;
@@ -40,26 +36,26 @@ import programmingtheiot.gda.system.SystemPerformanceManager;
 public class DeviceDataManager implements IDataMessageListener
 {
 	// static
-
 	private static final Logger _Logger =
 		Logger.getLogger(DeviceDataManager.class.getName());
 
 	// private var's
-
-	private boolean enableMqttClient = true;
-	private boolean enableCoapServer = false;
-	private boolean enableCloudClient = false;
-	private boolean enableSmtpClient = false;
+	private boolean enableMqttClient        = true;
+	private boolean enableCoapServer        = false;
+	private boolean enableCoapClient        = false;
+	private boolean enableCloudClient       = false;
+	private boolean enableSmtpClient        = false;
 	private boolean enablePersistenceClient = false;
-	private boolean enableSystemPerf = false;
+	private boolean enableSystemPerf        = false;
 
 	private IActuatorDataListener actuatorDataListener = null;
-	private MqttClientConnector mqttClient = null;
-	private IPubSubClient cloudClient = null;
-	private IPersistenceClient persistenceClient = null;
-	private IRequestResponseClient smtpClient = null;
-	private CoapServerGateway coapServer = null;
-	private SystemPerformanceManager sysPerfMgr = null;
+	private MqttClientConnector   mqttClient           = null;
+	private IPubSubClient         cloudClient          = null;
+	private IPersistenceClient    persistenceClient    = null;
+	private IRequestResponseClient smtpClient          = null;
+	private CoapServerGateway     coapServer           = null;
+	private CoapClientConnector   coapClient           = null;
+	private SystemPerformanceManager sysPerfMgr        = null;
 
 	// constructors
 
@@ -76,6 +72,10 @@ public class DeviceDataManager implements IDataMessageListener
 		this.enableCoapServer =
 			configUtil.getBoolean(
 				ConfigConst.GATEWAY_DEVICE, ConfigConst.ENABLE_COAP_SERVER_KEY);
+
+		this.enableCoapClient =
+			configUtil.getBoolean(
+				ConfigConst.GATEWAY_DEVICE, ConfigConst.ENABLE_COAP_CLIENT_KEY);
 
 		this.enableCloudClient =
 			configUtil.getBoolean(
@@ -96,10 +96,8 @@ public class DeviceDataManager implements IDataMessageListener
 		boolean enablePersistenceClient)
 	{
 		super();
-
 		initManager();
 	}
-
 
 	// public methods
 
@@ -108,11 +106,9 @@ public class DeviceDataManager implements IDataMessageListener
 	{
 		if (data != null) {
 			_Logger.info("Handling actuator response: " + data.getName());
-
 			if (data.hasError()) {
 				_Logger.warning("Error flag set for ActuatorData instance.");
 			}
-
 			return true;
 		} else {
 			return false;
@@ -124,9 +120,7 @@ public class DeviceDataManager implements IDataMessageListener
 	{
 		if (data != null) {
 			_Logger.info("Handling actuator command request: " + data.getName());
-
 			handleIncomingDataAnalysis(resourceName, data);
-
 			return true;
 		} else {
 			return false;
@@ -149,11 +143,9 @@ public class DeviceDataManager implements IDataMessageListener
 	{
 		if (data != null) {
 			_Logger.info("Handling sensor message: " + data.getName());
-
 			if (data.hasError()) {
 				_Logger.warning("Error flag set for SensorData instance.");
 			}
-
 			return true;
 		} else {
 			return false;
@@ -165,11 +157,9 @@ public class DeviceDataManager implements IDataMessageListener
 	{
 		if (data != null) {
 			_Logger.info("Handling system performance message: " + data.getName());
-
 			if (data.hasError()) {
 				_Logger.warning("Error flag set for SystemPerformanceData instance.");
 			}
-
 			return true;
 		} else {
 			return false;
@@ -210,9 +200,11 @@ public class DeviceDataManager implements IDataMessageListener
 			if (this.coapServer.startServer()) {
 				_Logger.info("CoAP server started.");
 			} else {
-				_Logger.severe("Failed to start CoAP server. Check log file for details.");
+				_Logger.severe("Failed to start CoAP server.");
 			}
 		}
+
+		// CoAP client is stateless - no start needed
 	}
 
 	public void stopManager()
@@ -240,11 +232,10 @@ public class DeviceDataManager implements IDataMessageListener
 			if (this.coapServer.stopServer()) {
 				_Logger.info("CoAP server stopped.");
 			} else {
-				_Logger.severe("Failed to stop CoAP server. Check log file for details.");
+				_Logger.severe("Failed to stop CoAP server.");
 			}
 		}
 	}
-
 
 	// private methods
 
@@ -268,6 +259,12 @@ public class DeviceDataManager implements IDataMessageListener
 
 		if (this.enableCoapServer) {
 			this.coapServer = new CoapServerGateway(this);
+		}
+
+		if (this.enableCoapClient) {
+			this.coapClient = new CoapClientConnector();
+			this.coapClient.setDataMessageListener(this);
+			_Logger.info("CoAP client enabled.");
 		}
 
 		if (this.enableCloudClient) {
@@ -302,6 +299,4 @@ public class DeviceDataManager implements IDataMessageListener
 		_Logger.fine("Handling upstream transmission for resource: " + resourceName);
 		return false;
 	}
-} 
-
-
+}
