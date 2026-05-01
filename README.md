@@ -28,103 +28,66 @@ I implemented/updated the following components:
 - setConnectionListener() stores IConnectionListener reference
 - connectComplete() calls connListener.onConnect() after successful connection
 - disconnectClient() calls connListener.onDisconnect() on clean disconnect
-- Added protected String-based publish/subscribe/unsubscribe methods:
-  - publishMessage(String, byte[], int)
-  - subscribeToTopic(String, int) — delegates to subscribeToTopic(String, int, null)
-  - subscribeToTopic(String, int, IMqttMessageListener)
-  - unsubscribeFromTopic(String)
+- Added protected String-based publish/subscribe/unsubscribe methods
 - Public ResourceNameEnum-based methods now delegate to protected String-based methods
 - connectComplete() skips CDA topic subscriptions when useCloudGatewayConfig is true
 
 ### ICloudClient (GDA-11-002)
 - New interface in programmingtheiot.gda.connection package
-- Defines standard method signatures:
-  - connectClient() / disconnectClient()
-  - sendEdgeDataToCloud(ResourceNameEnum, SensorData)
-  - sendEdgeDataToCloud(ResourceNameEnum, SystemPerformanceData)
-  - subscribeToCloudEvents(ResourceNameEnum)
-  - unsubscribeFromCloudEvents(ResourceNameEnum)
-  - setDataMessageListener(IDataMessageListener)
+- Defines: connectClient, disconnectClient, sendEdgeDataToCloud (x2),
+  subscribeToCloudEvents, unsubscribeFromCloudEvents, setDataMessageListener
 
 ### DataUtil (GDA-11-002)
-- Updated actuatorDataToTimeAndValueJson() to use TimeAndValuePayloadData:
-  - Creates TimeAndValuePayloadData(data) and serializes to JSON
-  - Produces minimal payload with only value + timestamp for Ubidots compatibility
-- Updated sensorDataToTimeAndValueJson() similarly:
-  - Creates TimeAndValuePayloadData(data) and serializes to JSON
+- Updated actuatorDataToTimeAndValueJson() to use TimeAndValuePayloadData
+- Updated sensorDataToTimeAndValueJson() to use TimeAndValuePayloadData
+- Both produce minimal value + timestamp payload for Ubidots compatibility
 
 ### CloudClientConnector (GDA-11-003, GDA-11-004)
 - Implements ICloudClient and IConnectionListener
-- Constructor loads baseTopic from Cloud.GatewayService section of PiotConfig.props
-- connectClient() creates MqttClientConnector(CLOUD_GATEWAY_SERVICE) and sets itself as IConnectionListener
-- onConnect() callback (called by MqttClientConnector.connectComplete()):
-  - Creates LedEnablementMessageListener inner class instance
-  - Publishes initial invalid ActuatorData (-1) to create LED topic on Ubidots if not exists
-  - Subscribes to LED actuation topic using LedEnablementMessageListener
+- Constructor loads baseTopic from Cloud.GatewayService in PiotConfig.props
+- connectClient() creates MqttClientConnector(CLOUD_GATEWAY_SERVICE) and registers itself as IConnectionListener
+- onConnect() publishes initial invalid ActuatorData to create LED topic on Ubidots, then subscribes to LED actuation topic
 - sendEdgeDataToCloud(SensorData) converts using sensorDataToTimeAndValueJson and publishes
-- sendEdgeDataToCloud(SystemPerformanceData) splits into two SensorData instances:
-  - CpuUtil: CPU utilization value
-  - MemUtil: memory utilization value
-- Topic naming follows Ubidots convention: /v1.6/devices/{deviceName}/{resourceType}
-- LedEnablementMessageListener inner class:
-  - Parses incoming MQTT payload as ActuatorData JSON
-  - Sets locationID to ConstrainedDevice, typeID to LED_ACTUATOR_TYPE
-  - ON command (1): sets stateData to "LED switching ON"
-  - OFF command (0): sets stateData to "LED switching OFF"
-  - Invalid values ignored silently
-  - Forwards valid ActuatorData JSON to DeviceDataManager via handleIncomingMessage()
+- sendEdgeDataToCloud(SystemPerformanceData) splits into CpuUtil and MemUtil SensorData instances
+- LedEnablementMessageListener inner class parses incoming LED commands (ON=1, OFF=0) and forwards to DeviceDataManager
 
 ### DeviceDataManager (GDA-11-003, GDA-11-004)
-- cloudClient field changed from IPubSubClient to ICloudClient
+- cloudClient field typed as ICloudClient
 - initManager() instantiates CloudClientConnector when enableCloudClient is true
-- startManager() connects cloud client FIRST before starting sysPerfMgr:
-  - Ensures cloud connection is ready before any telemetry is generated
+- startManager() connects cloud client first before starting sysPerfMgr
 - stopManager() unsubscribes from cloud events and disconnects cloud client
 - handleSensorMessage() forwards SensorData to cloudClient.sendEdgeDataToCloud()
 - handleSystemPerformanceMessage() forwards SystemPerformanceData to cloudClient.sendEdgeDataToCloud()
-- handleIncomingMessage() updated for cloud actuation events:
-  - Validates resourceName == CDA_ACTUATOR_CMD_RESOURCE
-  - Converts JSON to ActuatorData and back for validation
-  - Publishes validated ActuatorData JSON to CDA via local MQTT broker
+- handleIncomingMessage() validates ActuatorData JSON and publishes to CDA via local MQTT
 
 ### Cloud Configuration (CFG-11-001)
 - Created Ubidots STEM account at stem.ubidots.com
-- Generated API token: stored in UbidotsCloudCred.props (outside Git repo)
+- Generated API token stored in UbidotsCloudCred.props (outside Git repo)
 - Downloaded Ubidots TLS certificate chain (2 certs) as UbidotsCloudCert.pem
-- Updated PiotConfig.props Cloud.GatewayService section:
+- Updated PiotConfig.props:
   - host = industrial.api.ubidots.com
   - securePort = 8883
   - enableCrypt = True
   - baseTopic = /v1.6/devices/
-  - credFile and certFile point to absolute paths outside Git repo
 
-## Testing
+## Tests
 
-    # Terminal 1 - Start Mosquitto (TLS enabled)
-    sudo mosquitto -c /etc/mosquitto/mosquitto.conf
+| Task | Test | Command |
+|------|------|---------|
+| PIOT-GDA-11-002 | TimeAndValuePayloadDataTest | `mvn test -Dtest=TimeAndValuePayloadDataTest` |
+| PIOT-GDA-11-003 | CloudClientConnectorTest | `mvn test -Dtest=CloudClientConnectorTest` |
+| PIOT-GDA-11-004 | CloudClientConnectorTest (full) | `mvn test -Dtest=CloudClientConnectorTest` |
 
-    # Terminal 2 - Run CloudClientConnector integration test
-    cd ~/IoT_labs_TELE6530/gda-java-components
-    mvn test -Dtest=CloudClientConnectorTest -Dsurefire.failIfNoSpecifiedTests=false
-
-    # Terminal 3 - Run TimeAndValuePayloadData unit test
-    mvn test -Dtest=TimeAndValuePayloadDataTest -Dsurefire.failIfNoSpecifiedTests=false
-
-    # Full build
-    mvn compile
-
-## Tests Passed
+## Test Results
 
 | Task | Test | Result |
 |------|------|--------|
-| PIOT-GDA-11-001 | MqttClientConnectorTest (cloud config mode) | PASSED |
+| PIOT-GDA-11-001 | MqttClientConnector updated — compile check | PASSED |
 | PIOT-GDA-11-002 | TimeAndValuePayloadDataTest | PASSED |
 | PIOT-GDA-11-003 | CloudClientConnectorTest (integrated) | PASSED |
 | PIOT-GDA-11-004 | CloudClientConnectorTest (integrated + LED) | PASSED |
 
-## Integration Test Results
-
-### PIOT-GDA-11-003 / PIOT-GDA-11-004 — CloudClientConnectorTest
+## Integration Test Log Output
 
     INFO: CloudClientConnector created. Topic prefix: /v1.6/devices/
     INFO: Configuring TLS...
@@ -146,8 +109,6 @@ I implemented/updated the following components:
 
     Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
     BUILD SUCCESS
-Please refer to the referenced libraries for their respective licenses. 
-
 
 ## Summary
-Lab Module 11 extended the GDA to connect the existing edge-tier IoT pipeline to the Ubidots STEM cloud service via TLS-secured MQTT. The GDA now forwards sensor and system performance data from the CDA to Ubidots using the TimeAndValuePayloadData format compatible with the Ubidots API. The CloudClientConnector implements both ICloudClient and IConnectionListener, delegating all MQTT connectivity to an internally managed MqttClientConnector configured in cloud mode. Upon successful cloud connection, the GDA subscribes to the LED actuation topic and processes incoming commands via the LedEnablementMessageListener inner class, which parses and forwards LED ON/OFF commands to the CDA via the local MQTT broker. All four required GDA tasks passed successfully. 
+Lab Module 11 extended the GDA to connect the existing edge-tier IoT pipeline to the Ubidots STEM cloud service via TLS-secured MQTT. The GDA forwards sensor and system performance data from the CDA to Ubidots using the TimeAndValuePayloadData format. The CloudClientConnector implements both ICloudClient and IConnectionListener, delegating MQTT connectivity to an internally managed MqttClientConnector configured in cloud mode. Upon successful cloud connection, the GDA subscribes to the LED actuation topic and processes incoming commands via the LedEnablementMessageListener inner class, which forwards LED ON/OFF commands to the CDA via the local MQTT broker. All four required GDA tasks passed successfully.
