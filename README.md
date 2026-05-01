@@ -1,96 +1,153 @@
-# Programming the IoT - GDA Java Components
-This is the source repository for the Java components related to my Programming the Internet of Things book and Connected Devices IoT course. These are shell wrappers ONLY and are not a solution set (which is a separate repository, not yet released). For convenience to the reader, some basic functionality has already been implemented (such as configuration logic, consts, interfaces, a simple certificate file load utility, and test cases).
+=========================
+📄 GDA README — Lab Module 11
+=========================
 
-The code in this repository is largely comprised of shell classes that are designed to be implemented by the reader and are NOT solutions. These shell classes and their relationships respresent a notional design that aligns with the requirements listed in [Programming the IoT Requirements](https://github.com/orgs/programming-the-iot/projects/1). These requirements encapsulate the programming exercises presented in my book [Programming the Internet of Things: An Introduction to Building Integrated, Device to Cloud IoT Solutions](https://learning.oreilly.com/library/view/programming-the-internet/9781492081401).
+## Overview
+In Lab Module 11, I implemented cloud integration functionality in the GDA using MQTT to connect to the Ubidots STEM cloud service. Building directly on the TLS-secured MQTT pipeline from Lab Module 10, the GDA now acts as a cloud gateway — forwarding telemetry (sensor data and system performance data) received from the CDA up to Ubidots, and relaying LED actuation commands from the cloud back down to the CDA.
 
-## Links, Exercises, Updates, Errata, and Clarifications
+## What I Implemented
+I implemented/updated the following components:
+- MqttClientConnector (cloud config support, IConnectionListener, protected pub/sub methods)
+- ICloudClient (new interface in gda.connection package)
+- IConnectionListener (existing interface in gda.connection package)
+- CloudClientConnector (new class implementing ICloudClient + IConnectionListener)
+- DeviceDataManager (cloud client wiring, handleIncomingMessage update)
+- DataUtil (actuatorDataToTimeAndValueJson, sensorDataToTimeAndValueJson)
+- PiotConfig.props (Cloud.GatewayService section with Ubidots credentials and cert)
 
-Please see the following links to access exercises, errata / clarifications, and the e-book:
- - [Programming the IoT Kanban Board](https://github.com/orgs/programming-the-iot/projects/1)
- - [Errata and Clarifications](https://labbenchstudios.com/programming-the-iot-book/programming-the-iot-1st-edition/)
- - [Programming the Internet of Things Book](https://learning.oreilly.com/library/view/programming-the-internet/9781492081401/)
+## How It Works
 
-## How to use this repository
-If you're reading [Programming the Internet of Things: An Introduction to Building Integrated, Device to Cloud IoT Solutions](https://learning.oreilly.com/library/view/programming-the-internet/9781492081401), you'll see a tie-in with the exercises described in each chapter and this repository. Most of the code in the main src tree is NOT implemented by design. It's intended for you - as the reader of my book (and possibly a student in one of my IoT courses) - to implement by filling in the implementation details as you work through each exercise.
+### MqttClientConnector (GDA-11-001)
+- Added two new class-scoped variables:
+  - connListener: IConnectionListener reference for notifying CloudClientConnector
+  - useCloudGatewayConfig: boolean flag to switch between local and cloud MQTT config
+- Added three constructors:
+  - Default: delegates to MqttClientConnector(false)
+  - Boolean: switches config section based on useCloudGatewayConfig flag
+  - String: loads config from specified section (MQTT or Cloud.GatewayService)
+- setConnectionListener() stores IConnectionListener reference
+- connectComplete() calls connListener.onConnect() after successful connection
+- disconnectClient() calls connListener.onDisconnect() on clean disconnect
+- Added protected String-based publish/subscribe/unsubscribe methods:
+  - publishMessage(String, byte[], int)
+  - subscribeToTopic(String, int) — delegates to subscribeToTopic(String, int, null)
+  - subscribeToTopic(String, int, IMqttMessageListener)
+  - unsubscribeFromTopic(String)
+- Public ResourceNameEnum-based methods now delegate to protected String-based methods
+- connectComplete() skips CDA topic subscriptions when useCloudGatewayConfig is true
 
-A solution set is available, although I haven't yet released it. Stay tuned for updates on this topic.
+### ICloudClient (GDA-11-002)
+- New interface in programmingtheiot.gda.connection package
+- Defines standard method signatures:
+  - connectClient() / disconnectClient()
+  - sendEdgeDataToCloud(ResourceNameEnum, SensorData)
+  - sendEdgeDataToCloud(ResourceNameEnum, SystemPerformanceData)
+  - subscribeToCloudEvents(ResourceNameEnum)
+  - unsubscribeFromCloudEvents(ResourceNameEnum)
+  - setDataMessageListener(IDataMessageListener)
 
-## This repository aligns to exercises in Programming the Internet of Things
-These components are all written in Java 11 (or higher), and correlate to the exercises designed for the Gateway Device Application (GDA) specified in my book [Programming the Internet of Things: An Introduction to Building Integrated, Device to Cloud IoT Solutions](https://learning.oreilly.com/library/view/programming-the-internet/9781492081401).
+### DataUtil (GDA-11-002)
+- Updated actuatorDataToTimeAndValueJson() to use TimeAndValuePayloadData:
+  - Creates TimeAndValuePayloadData(data) and serializes to JSON
+  - Produces minimal payload with only value + timestamp for Ubidots compatibility
+- Updated sensorDataToTimeAndValueJson() similarly:
+  - Creates TimeAndValuePayloadData(data) and serializes to JSON
 
-## How to navigate the directory structure for this repository
-This repository is comprised of the following top level paths:
-- [config](https://github.com/programming-the-iot/gda-java-components/tree/default/config): Contains basic configuration file(s).
-- [src](https://github.com/programming-the-iot/gda-java-components/tree/default/src): Contains the following source trees:
-  - [src/main/java](https://github.com/programming-the-iot/gda-java-components/tree/default/src/main/java): The main source tree for gda-java-components. Keep in mind that most of these classes are shell representations ONLY and must be implemented as part of the exercises referenced above.
-  - [src/test/java](https://github.com/programming-the-iot/gda-java-components/tree/default/src/test/java): The test source tree for gda-java-components. These are designed to perform very basic unit and integration testing of the implementation of the exercises referenced above. This tree is sectioned by part - part01, part02, part03, and part04 - which correspond to the structure of Programming the Internet of Things.
+### CloudClientConnector (GDA-11-003, GDA-11-004)
+- Implements ICloudClient and IConnectionListener
+- Constructor loads baseTopic from Cloud.GatewayService section of PiotConfig.props
+- connectClient() creates MqttClientConnector(CLOUD_GATEWAY_SERVICE) and sets itself as IConnectionListener
+- onConnect() callback (called by MqttClientConnector.connectComplete()):
+  - Creates LedEnablementMessageListener inner class instance
+  - Publishes initial invalid ActuatorData (-1) to create LED topic on Ubidots if not exists
+  - Subscribes to LED actuation topic using LedEnablementMessageListener
+- sendEdgeDataToCloud(SensorData) converts using sensorDataToTimeAndValueJson and publishes
+- sendEdgeDataToCloud(SystemPerformanceData) splits into two SensorData instances:
+  - CpuUtil: CPU utilization value
+  - MemUtil: memory utilization value
+- Topic naming follows Ubidots convention: /v1.6/devices/{deviceName}/{resourceType}
+- LedEnablementMessageListener inner class:
+  - Parses incoming MQTT payload as ActuatorData JSON
+  - Sets locationID to ConstrainedDevice, typeID to LED_ACTUATOR_TYPE
+  - ON command (1): sets stateData to "LED switching ON"
+  - OFF command (0): sets stateData to "LED switching OFF"
+  - Invalid values ignored silently
+  - Forwards valid ActuatorData JSON to DeviceDataManager via handleIncomingMessage()
 
-Here are some other files at the top level that are important to review:
-- [pom.xml](https://github.com/programming-the-iot/gda-java-components/blob/default/pom.xml): The Maven project configuration file, with relevant depedencies, etc.
-- [README.md](https://github.com/programming-the-iot/gda-java-components/blob/default/README.md): This README.me file.
-- [LICENSE](https://github.com/programming-the-iot/gda-java-components/blob/default/LICENSE): The repository's LICENSE file.
+### DeviceDataManager (GDA-11-003, GDA-11-004)
+- cloudClient field changed from IPubSubClient to ICloudClient
+- initManager() instantiates CloudClientConnector when enableCloudClient is true
+- startManager() connects cloud client FIRST before starting sysPerfMgr:
+  - Ensures cloud connection is ready before any telemetry is generated
+- stopManager() unsubscribes from cloud events and disconnects cloud client
+- handleSensorMessage() forwards SensorData to cloudClient.sendEdgeDataToCloud()
+- handleSystemPerformanceMessage() forwards SystemPerformanceData to cloudClient.sendEdgeDataToCloud()
+- handleIncomingMessage() updated for cloud actuation events:
+  - Validates resourceName == CDA_ACTUATOR_CMD_RESOURCE
+  - Converts JSON to ActuatorData and back for validation
+  - Publishes validated ActuatorData JSON to CDA via local MQTT broker
 
-Lastly, here are some 'dot' ('.{filename}') files pertaining to dev environment setup that you may find useful (or not - if so, just delete them after cloning the repo):
-- [.classpath](https://github.com/programming-the-iot/gda-java-components/blob/default/.classpath): The Eclipse IDE CLASSPATH configuration file for your Java environment that may / may not be useful for your own cloned instance.
-- [.gitignore](https://github.com/programming-the-iot/gda-java-components/blob/default/.gitignore): The obligatory .gitignore that you should probably keep in place, with any additions that are relevant for your own cloned instance.
-- [.project](https://github.com/programming-the-iot/gda-java-components/blob/default/.project): The Eclipse IDE project configuration file that may / may not be useful for your own cloned instance. Note that using this file to help create your Eclipse IDE project will result in the project name 'piot-gda-java-components' (which can be changed, of course).
-- [.settings/org.eclipse.jdt.core.prefs](https://github.com/programming-the-iot/gda-java-components/blob/default/.settings/org.eclipse.jdt.core.prefs): The Eclipse IDE settings file, which is only included to assist with setting up an Eclipse dev environment related to my IoT courses and book exercises, which may / may not be useful for your own cloned instance.
+### Cloud Configuration (CFG-11-001)
+- Created Ubidots STEM account at stem.ubidots.com
+- Generated API token: stored in UbidotsCloudCred.props (outside Git repo)
+- Downloaded Ubidots TLS certificate chain (2 certs) as UbidotsCloudCert.pem
+- Updated PiotConfig.props Cloud.GatewayService section:
+  - host = industrial.api.ubidots.com
+  - securePort = 8883
+  - enableCrypt = True
+  - baseTopic = /v1.6/devices/
+  - credFile and certFile point to absolute paths outside Git repo
 
-NOTE: The directory structure and all files are subject to change based on feedback I receive from readers of my book and students in my IoT class, as well as improvements I find to be helpful for overall repo betterment.
+## Testing
 
-# Other things to know
+    # Terminal 1 - Start Mosquitto (TLS enabled)
+    sudo mosquitto -c /etc/mosquitto/mosquitto.conf
 
-## Pull requests
-PR's are disabled while the codebase is being developed.
+    # Terminal 2 - Run CloudClientConnector integration test
+    cd ~/IoT_labs_TELE6530/gda-java-components
+    mvn test -Dtest=CloudClientConnectorTest -Dsurefire.failIfNoSpecifiedTests=false
 
-## Updates
-Much of this repository, and in particular unit and integration tests, will continue to evolve, so please check back regularly for potential updates. Please note that API changes can - and likely will - occur at any time.
+    # Terminal 3 - Run TimeAndValuePayloadData unit test
+    mvn test -Dtest=TimeAndValuePayloadDataTest -Dsurefire.failIfNoSpecifiedTests=false
 
-# REFERENCES
-This repository has external dependencies on other open source projects. I'm grateful to the open source community and authors / maintainers of the following libraries:
+    # Full build
+    mvn compile
 
-Lab Module Library References (not all are required for each lab module):
+## Tests Passed
 
-- [aws-iot-device-sdk-java](https://github.com/aws/aws-iot-device-sdk-java)
-  - Reference: AWS. AWS IoT Device SDK (Java). (2023) [Online]. Available: https://github.com/aws/aws-iot-device-sdk-java.
-- [aws-iot-device-sdk-java-samples](https://github.com/aws/aws-iot-device-sdk-java)
-  - Reference: AWS. AWS IoT Device SDK Samples (Java). (2023) [Online]. Available: https://github.com/aws/aws-iot-device-sdk-java.
-- [azure-iot-device-client](https://github.com/Azure/azure-iot-sdk-java)
-  - Reference: Microsoft. Azure IoT Device Client (Java). (2023) [Online]. Available: https://github.com/Azure/azure-iot-sdk-java.
-- [californium-core](https://github.com/eclipse/californium)
-  - Reference: Eclipse Foundation, Inc. Californium (Cf) - CoAP for Java. (2020) [Online]. Available. https://github.com/eclipse/californium.
-- [californium/scandium-core](https://github.com/eclipse/californium/tree/master/scandium-core)
-  - Reference: Eclipse Foundation, Inc. Scandium (Sc) - Security for Californium. (2021) [Online]. Available. https://github.com/eclipse/californium/tree/master/scandium-core.
-- [commons-cli](https://commons.apache.org/proper/commons-cli/)
-  - Reference: The Apache Software Foundation. Commons CLI. (2019) [Online]. Available. https://commons.apache.org/proper/commons-cli/.
-- [commons-configuration2](commons.apache.org/proper/commons-configuration/)
-  - Reference: The Apache Software Foundation. Commons Configuration 2. (2023) [Online]. Available: https://commons.apache.org/proper/commons-configuration/.
-- [org.eclipse.paho.client.mqttv3](https://www.eclipse.org/paho/)
-  - Reference: Eclipse Foundation, Inc. Eclipse Paho Java Client. (2020) [Online]. Available: https://github.com/eclipse/paho.mqtt.java.
-- [org.eclipse.paho.mqttv5.client](https://www.eclipse.org/paho/)
-  - Reference: Eclipse Foundation, Inc. Eclipse Paho Java Client. (2023) [Online]. Available: https://github.com/eclipse/paho.mqtt.java.
-- [gson](https://github.com/google/gson)
-  - Reference: Google. Gson. (2008) [Online]. Available: https://github.com/google/gson.
-- [influxdb-client-java](https://github.com/influxdata/influxdb-client-java)
-  - Reference: Influx Data, Inc. Influx DB. (2023) [Online]. Available: https://github.com/influxdata/influxdb-client-java.
-- [jakarta.mail-api](https://jakartaee.github.io/mail-api/)
-  - Reference: Eclipse Foundation, Inc. Jakarta Mail. (2023) [Online]. Available: https://github.com/jakartaee/mail-api.
-- [jedis](https://github.com/redis/jedis)
-  - Reference: J. Leibiusky. Jedis. (2020) [Online]. Available: https://github.com/redis/jedis.
-- [junit](https://github.com/junit-team/junit4/)
-  - Reference: JUnit. JUnit 4. (2020) [Online]. Available: https://junit.org/junit4/.
+| Task | Test | Result |
+|------|------|--------|
+| PIOT-GDA-11-001 | MqttClientConnectorTest (cloud config mode) | PASSED |
+| PIOT-GDA-11-002 | TimeAndValuePayloadDataTest | PASSED |
+| PIOT-GDA-11-003 | CloudClientConnectorTest (integrated) | PASSED |
+| PIOT-GDA-11-004 | CloudClientConnectorTest (integrated + LED) | PASSED |
 
-NOTE: This list will be updated as other libraries / dependencies are incorporated.
+## Integration Test Results
 
-# FAQ
-For typical questions (and answers) to the repositories of the Programming the IoT project, please see the [FAQ](https://github.com/programming-the-iot/book-exercise-tasks/blob/default/FAQ.md).
+### PIOT-GDA-11-003 / PIOT-GDA-11-004 — CloudClientConnectorTest
 
-# IMPORTANT NOTES
-This code base is under active development.
+    INFO: CloudClientConnector created. Topic prefix: /v1.6/devices/
+    INFO: Configuring TLS...
+    INFO: PEM file valid. Using secure connection: .../UbidotsCloudCert.pem
+    INFO: Successfully imported X.509 certificate UbidotsCloudCert.pem.3139.1
+    INFO: Successfully imported X.509 certificate UbidotsCloudCert.pem.1939.2
+    INFO: X.509 certificate load and TLSv1.2 socket init successful
+    INFO: TLS enabled.
+    INFO: Successfully loaded credentials from file: .../UbidotsCloudCred.props
+    INFO: Credentials now set.
+    INFO: Using URL for broker conn: ssl://industrial.api.ubidots.com:8883
+    INFO: Setting connection listener.
+    INFO: MQTT client connecting to broker: ssl://industrial.api.ubidots.com:8883
+    INFO: Successfully connected cloud client.
+    INFO: MQTT connection successful (is reconnect = false). Broker: ssl://localhost:8883
+    INFO: Subscribing to topic: PIOT/ConstrainedDevice/ActuatorResponse
+    INFO: Subscribing to topic: PIOT/ConstrainedDevice/SensorMsg
+    INFO: Subscribing to topic: PIOT/ConstrainedDevice/SystemPerfMsg
 
-If  any  code  samples  or  other  technology  this  work  contains, describes, and / or is  subject  to  open  source licenses  or  the  intellectual  property  rights  of  others,  it  is  your  responsibility  to  ensure  that  your  use thereof complies with such licenses and/or rights.
+    Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+    BUILD SUCCESS
+Please refer to the referenced libraries for their respective licenses. 
 
-# LICENSE
-Please see [LICENSE](https://github.com/programming-the-iot/gda-java-components/blob/default/LICENSE) if you plan to use this code.
 
-Please refer to the referenced libraries for their respective licenses.
+## Summary
+Lab Module 11 extended the GDA to connect the existing edge-tier IoT pipeline to the Ubidots STEM cloud service via TLS-secured MQTT. The GDA now forwards sensor and system performance data from the CDA to Ubidots using the TimeAndValuePayloadData format compatible with the Ubidots API. The CloudClientConnector implements both ICloudClient and IConnectionListener, delegating all MQTT connectivity to an internally managed MqttClientConnector configured in cloud mode. Upon successful cloud connection, the GDA subscribes to the LED actuation topic and processes incoming commands via the LedEnablementMessageListener inner class, which parses and forwards LED ON/OFF commands to the CDA via the local MQTT broker. All four required GDA tasks passed successfully. 
