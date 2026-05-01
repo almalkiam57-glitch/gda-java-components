@@ -223,7 +223,7 @@ public class CoapClientConnector implements IRequestResponseClient
 		}
 
 		String resourcePath = getResourcePath(resource, name);
-		_Logger.info("Sending POST to: " + resourcePath);
+                // _Logger.info("Sending POST to: " + resourcePath);
 
 		try {
 			if (enableCON) {
@@ -270,7 +270,7 @@ public class CoapClientConnector implements IRequestResponseClient
 		}
 
 		String resourcePath = getResourcePath(resource, name);
-		_Logger.info("Sending PUT to: " + resourcePath);
+                // _Logger.info("Sending PUT to: " + resourcePath);
 
 		try {
 			if (enableCON) {

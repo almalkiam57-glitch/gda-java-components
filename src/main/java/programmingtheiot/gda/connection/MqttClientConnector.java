@@ -11,37 +11,49 @@
 
 package programmingtheiot.gda.connection;
 
+import java.io.File;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.net.ssl.SSLSocketFactory;
+
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
+import org.eclipse.paho.client.mqttv3.IMqttMessageListener;
+import org.eclipse.paho.client.mqttv3.MqttAsyncClient;
 import org.eclipse.paho.client.mqttv3.MqttCallbackExtended;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
-import org.eclipse.paho.client.mqttv3.MqttPersistenceException;
-import org.eclipse.paho.client.mqttv3.MqttSecurityException;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
 import programmingtheiot.common.ConfigConst;
 import programmingtheiot.common.ConfigUtil;
 import programmingtheiot.common.IDataMessageListener;
 import programmingtheiot.common.ResourceNameEnum;
+import programmingtheiot.common.SimpleCertManagementUtil;
+import programmingtheiot.data.ActuatorData;
+import programmingtheiot.data.DataUtil;
+import programmingtheiot.data.SensorData;
+import programmingtheiot.data.SystemPerformanceData;
 
 public class MqttClientConnector implements IPubSubClient, MqttCallbackExtended
 {
 	private static final Logger _Logger =
 		Logger.getLogger(MqttClientConnector.class.getName());
 
-	private boolean useAsyncClient = false;
+	private boolean useAsyncClient      = false;
+	private boolean enableEncryption    = false;
+	private boolean useCleanSession     = false;
+	private boolean enableAutoReconnect = true;
 
-	private MqttClient           mqttClient = null;
+	private MqttAsyncClient      mqttClient = null;
 	private MqttConnectOptions   connOpts = null;
 	private MemoryPersistence    persistence = null;
 	private IDataMessageListener dataMsgListener = null;
 
+	private String  pemFileName = null;
 	private String  clientID = null;
 	private String  brokerAddr = null;
 	private String  host = ConfigConst.DEFAULT_HOST;
@@ -52,35 +64,7 @@ public class MqttClientConnector implements IPubSubClient, MqttCallbackExtended
 	public MqttClientConnector()
 	{
 		super();
-
-		ConfigUtil configUtil = ConfigUtil.getInstance();
-
-		this.host =
-		    configUtil.getProperty(
-		        ConfigConst.MQTT_GATEWAY_SERVICE, ConfigConst.HOST_KEY, ConfigConst.DEFAULT_HOST);
-
-		this.port =
-		    configUtil.getInteger(
-		        ConfigConst.MQTT_GATEWAY_SERVICE, ConfigConst.PORT_KEY, ConfigConst.DEFAULT_MQTT_PORT);
-
-		this.brokerKeepAlive =
-		    configUtil.getInteger(
-		        ConfigConst.MQTT_GATEWAY_SERVICE, ConfigConst.KEEP_ALIVE_KEY, ConfigConst.DEFAULT_KEEP_ALIVE);
-
-		this.useAsyncClient =
-		    configUtil.getBoolean(
-		        ConfigConst.MQTT_GATEWAY_SERVICE, ConfigConst.USE_ASYNC_CLIENT_KEY);
-
-		this.clientID = MqttClient.generateClientId();
-
-		this.persistence = new MemoryPersistence();
-		this.connOpts    = new MqttConnectOptions();
-
-		this.connOpts.setKeepAliveInterval(this.brokerKeepAlive);
-		this.connOpts.setCleanSession(false);
-		this.connOpts.setAutomaticReconnect(true);
-
-		this.brokerAddr = this.protocol + "://" + this.host + ":" + this.port;
+		initClientParameters(ConfigConst.MQTT_GATEWAY_SERVICE);
 	}
 
 	@Override
@@ -88,7 +72,7 @@ public class MqttClientConnector implements IPubSubClient, MqttCallbackExtended
 	{
 		try {
 			if (this.mqttClient == null) {
-				this.mqttClient = new MqttClient(this.brokerAddr, this.clientID, this.persistence);
+				this.mqttClient = new MqttAsyncClient(this.brokerAddr, this.clientID, this.persistence);
 				this.mqttClient.setCallback(this);
 			}
 
@@ -100,7 +84,7 @@ public class MqttClientConnector implements IPubSubClient, MqttCallbackExtended
 				_Logger.warning("MQTT client already connected to broker: " + this.brokerAddr);
 			}
 		} catch (MqttException e) {
-			_Logger.log(Level.SEVERE, "Failed to connect MQTT client to broker.", e);
+			_Logger.log(Level.SEVERE, "Failed to connect MQTT client to broker: " + this.brokerAddr, e);
 		}
 
 		return false;
@@ -135,12 +119,10 @@ public class MqttClientConnector implements IPubSubClient, MqttCallbackExtended
 	public boolean publishMessage(ResourceNameEnum topicName, String msg, int qos)
 	{
 		if (topicName == null) {
-			_Logger.warning("Resource is null. Unable to publish message: " + this.brokerAddr);
 			return false;
 		}
 
 		if (msg == null || msg.length() == 0) {
-			_Logger.warning("Message is null or empty. Unable to publish message: " + this.brokerAddr);
 			return false;
 		}
 
@@ -179,6 +161,23 @@ public class MqttClientConnector implements IPubSubClient, MqttCallbackExtended
 			return true;
 		} catch (Exception e) {
 			_Logger.log(Level.SEVERE, "Failed to subscribe to topic: " + topicName, e);
+		}
+
+		return false;
+	}
+
+	public boolean subscribeToTopic(String topicName, int qos, IMqttMessageListener listener)
+	{
+		if (topicName == null) {
+			return false;
+		}
+
+		try {
+			this.mqttClient.subscribe(topicName, qos, listener);
+			_Logger.info("Successfully subscribed to topic with listener: " + topicName);
+			return true;
+		} catch (Exception e) {
+			_Logger.log(Level.SEVERE, "Failed to subscribe to topic with listener: " + topicName, e);
 		}
 
 		return false;
@@ -226,6 +225,31 @@ public class MqttClientConnector implements IPubSubClient, MqttCallbackExtended
 	public void connectComplete(boolean reconnect, String serverURI)
 	{
 		_Logger.info("MQTT connection successful (is reconnect = " + reconnect + "). Broker: " + serverURI);
+
+		int qos = 1;
+
+		try {
+			_Logger.info("Subscribing to topic: " + ResourceNameEnum.CDA_ACTUATOR_RESPONSE_RESOURCE.getResourceName());
+			this.mqttClient.subscribe(
+				ResourceNameEnum.CDA_ACTUATOR_RESPONSE_RESOURCE.getResourceName(),
+				qos,
+				new ActuatorResponseMessageListener(ResourceNameEnum.CDA_ACTUATOR_RESPONSE_RESOURCE, this.dataMsgListener));
+
+			_Logger.info("Subscribing to topic: " + ResourceNameEnum.CDA_SENSOR_MSG_RESOURCE.getResourceName());
+			this.subscribeToTopic(
+				ResourceNameEnum.CDA_SENSOR_MSG_RESOURCE.getResourceName(),
+				qos,
+				new SensorDataMessageListener(ResourceNameEnum.CDA_SENSOR_MSG_RESOURCE, this.dataMsgListener));
+
+			_Logger.info("Subscribing to topic: " + ResourceNameEnum.CDA_SYSTEM_PERF_MSG_RESOURCE.getResourceName());
+			this.subscribeToTopic(
+				ResourceNameEnum.CDA_SYSTEM_PERF_MSG_RESOURCE.getResourceName(),
+				qos,
+				new SystemPerformanceDataMessageListener(ResourceNameEnum.CDA_SYSTEM_PERF_MSG_RESOURCE, this.dataMsgListener));
+
+		} catch (MqttException e) {
+			_Logger.warning("Failed to subscribe to CDA topics: " + e.getMessage());
+		}
 	}
 
 	@Override
@@ -250,17 +274,196 @@ public class MqttClientConnector implements IPubSubClient, MqttCallbackExtended
 
 	private void initClientParameters(String configSectionName)
 	{
-		// TODO: implement this
+		ConfigUtil configUtil = ConfigUtil.getInstance();
+
+		this.host =
+			configUtil.getProperty(
+				configSectionName, ConfigConst.HOST_KEY, ConfigConst.DEFAULT_HOST);
+		this.port =
+			configUtil.getInteger(
+				configSectionName, ConfigConst.PORT_KEY, ConfigConst.DEFAULT_MQTT_PORT);
+		this.brokerKeepAlive =
+			configUtil.getInteger(
+				configSectionName, ConfigConst.KEEP_ALIVE_KEY, ConfigConst.DEFAULT_KEEP_ALIVE);
+		this.enableEncryption =
+			configUtil.getBoolean(
+				configSectionName, ConfigConst.ENABLE_CRYPT_KEY);
+		this.pemFileName =
+			configUtil.getProperty(
+				configSectionName, ConfigConst.CERT_FILE_KEY);
+
+		this.useAsyncClient =
+			configUtil.getBoolean(
+				ConfigConst.MQTT_GATEWAY_SERVICE, ConfigConst.USE_ASYNC_CLIENT_KEY);
+
+		this.clientID =
+			configUtil.getProperty(
+				ConfigConst.GATEWAY_DEVICE, ConfigConst.DEVICE_LOCATION_ID_KEY, MqttClient.generateClientId());
+
+		this.persistence = new MemoryPersistence();
+		this.connOpts    = new MqttConnectOptions();
+
+		this.connOpts.setKeepAliveInterval(this.brokerKeepAlive);
+		this.connOpts.setCleanSession(this.useCleanSession);
+		this.connOpts.setAutomaticReconnect(this.enableAutoReconnect);
+
+		if (this.enableEncryption) {
+			initSecureConnectionParameters(configSectionName);
+		}
+
+		if (configUtil.hasProperty(configSectionName, ConfigConst.CRED_FILE_KEY)) {
+			initCredentialConnectionParameters(configSectionName);
+		}
+
+		this.brokerAddr = this.protocol + "://" + this.host + ":" + this.port;
+
+		_Logger.info("Using URL for broker conn: " + this.brokerAddr);
 	}
 
 	private void initCredentialConnectionParameters(String configSectionName)
 	{
-		// TODO: implement this
+		ConfigUtil configUtil = ConfigUtil.getInstance();
+
+		try {
+			_Logger.info("Checking if credentials file exists and is loadable...");
+
+			Properties props = configUtil.getCredentials(configSectionName);
+
+			if (props != null) {
+				this.connOpts.setUserName(props.getProperty(ConfigConst.USER_NAME_TOKEN_KEY, ""));
+				this.connOpts.setPassword(props.getProperty(ConfigConst.USER_AUTH_TOKEN_KEY, "").toCharArray());
+				_Logger.info("Credentials now set.");
+			} else {
+				_Logger.warning("No credentials are set.");
+			}
+		} catch (Exception e) {
+			_Logger.log(Level.WARNING, "Credential file non-existent. Disabling auth requirement.");
+		}
 	}
 
 	private void initSecureConnectionParameters(String configSectionName)
 	{
-		// TODO: implement this
+		ConfigUtil configUtil = ConfigUtil.getInstance();
+
+		try {
+			_Logger.info("Configuring TLS...");
+
+			if (this.pemFileName != null) {
+				File file = new File(this.pemFileName);
+
+				if (file.exists()) {
+					_Logger.info("PEM file valid. Using secure connection: " + this.pemFileName);
+				} else {
+					this.enableEncryption = false;
+					_Logger.log(Level.WARNING, "PEM file invalid. Using insecure connection: " + this.pemFileName, new Exception());
+					return;
+				}
+			}
+
+			SSLSocketFactory sslFactory =
+				SimpleCertManagementUtil.getInstance().loadCertificate(this.pemFileName);
+
+			this.connOpts.setSocketFactory(sslFactory);
+
+			this.port =
+				configUtil.getInteger(
+					configSectionName, ConfigConst.SECURE_PORT_KEY, ConfigConst.DEFAULT_MQTT_SECURE_PORT);
+
+			this.protocol = ConfigConst.DEFAULT_MQTT_SECURE_PROTOCOL;
+
+			_Logger.info("TLS enabled.");
+		} catch (Exception e) {
+			_Logger.log(Level.SEVERE, "Failed to initialize secure MQTT connection. Using insecure connection.", e);
+			this.enableEncryption = false;
+		}
+	}
+
+	// inner listener classes
+
+	private class ActuatorResponseMessageListener implements IMqttMessageListener
+	{
+		private ResourceNameEnum resource = null;
+		private IDataMessageListener dataMsgListener = null;
+
+		ActuatorResponseMessageListener(ResourceNameEnum resource, IDataMessageListener dataMsgListener)
+		{
+			this.resource = resource;
+			this.dataMsgListener = dataMsgListener;
+		}
+
+		@Override
+		public void messageArrived(String topic, MqttMessage message) throws Exception
+		{
+			try {
+				ActuatorData actuatorData =
+					DataUtil.getInstance().jsonToActuatorData(new String(message.getPayload()));
+
+				_Logger.info("Received ActuatorData response: " + actuatorData.getValue());
+
+				if (this.dataMsgListener != null) {
+					this.dataMsgListener.handleActuatorCommandResponse(resource, actuatorData);
+				}
+			} catch (Exception e) {
+				_Logger.warning("Failed to convert message payload to ActuatorData.");
+			}
+		}
+	}
+
+	private class SensorDataMessageListener implements IMqttMessageListener
+	{
+		private ResourceNameEnum resource = null;
+		private IDataMessageListener dataMsgListener = null;
+
+		SensorDataMessageListener(ResourceNameEnum resource, IDataMessageListener dataMsgListener)
+		{
+			this.resource = resource;
+			this.dataMsgListener = dataMsgListener;
+		}
+
+		@Override
+		public void messageArrived(String topic, MqttMessage message) throws Exception
+		{
+			try {
+				SensorData sensorData =
+					DataUtil.getInstance().jsonToSensorData(new String(message.getPayload()));
+
+				_Logger.info("Received SensorData: " + sensorData.getValue());
+
+				if (this.dataMsgListener != null) {
+					this.dataMsgListener.handleSensorMessage(resource, sensorData);
+				}
+			} catch (Exception e) {
+				_Logger.warning("Failed to convert message payload to SensorData.");
+			}
+		}
+	}
+
+	private class SystemPerformanceDataMessageListener implements IMqttMessageListener
+	{
+		private ResourceNameEnum resource = null;
+		private IDataMessageListener dataMsgListener = null;
+
+		SystemPerformanceDataMessageListener(ResourceNameEnum resource, IDataMessageListener dataMsgListener)
+		{
+			this.resource = resource;
+			this.dataMsgListener = dataMsgListener;
+		}
+
+		@Override
+		public void messageArrived(String topic, MqttMessage message) throws Exception
+		{
+			try {
+				SystemPerformanceData sysPerfData =
+					DataUtil.getInstance().jsonToSystemPerformanceData(new String(message.getPayload()));
+
+				_Logger.info("Received SystemPerformanceData: " + sysPerfData.getCpuUtilization());
+
+				if (this.dataMsgListener != null) {
+					this.dataMsgListener.handleSystemPerformanceMessage(resource, sysPerfData);
+				}
+			} catch (Exception e) {
+				_Logger.warning("Failed to convert message payload to SystemPerformanceData.");
+			}
+		}
 	}
 } 
-
