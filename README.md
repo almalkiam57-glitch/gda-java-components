@@ -1,96 +1,186 @@
-# Programming the IoT - GDA Java Components
-This is the source repository for the Java components related to my Programming the Internet of Things book and Connected Devices IoT course. These are shell wrappers ONLY and are not a solution set (which is a separate repository, not yet released). For convenience to the reader, some basic functionality has already been implemented (such as configuration logic, consts, interfaces, a simple certificate file load utility, and test cases).
+=========================
+📄 GDA README — Lab Module 10
+=========================
 
-The code in this repository is largely comprised of shell classes that are designed to be implemented by the reader and are NOT solutions. These shell classes and their relationships respresent a notional design that aligns with the requirements listed in [Programming the IoT Requirements](https://github.com/orgs/programming-the-iot/projects/1). These requirements encapsulate the programming exercises presented in my book [Programming the Internet of Things: An Introduction to Building Integrated, Device to Cloud IoT Solutions](https://learning.oreilly.com/library/view/programming-the-internet/9781492081401).
+## Overview
+In Lab Module 10, I implemented intelligent edge messaging using MQTT and CoAP to handle various messaging scenarios between the GDA and CDA. This includes TLS-encrypted MQTT connections, asynchronous MQTT client with inner message listener classes, humidity threshold analysis, actuation event publishing to the CDA, and performance testing of both MQTT and CoAP protocols.
 
-## Links, Exercises, Updates, Errata, and Clarifications
+## What I Implemented
+I implemented/updated the following components:
+- MqttClientConnector (TLS support, MqttAsyncClient, inner listener classes)
+- DeviceDataManager (humidity threshold analysis, upstream transmission)
+- PiotConfig.props (enableCrypt = True, certFile, securePort, humidity thresholds)
+- MqttClientPerformanceTest (INT-10-001)
+- CoapClientPerformanceTest (INT-10-002)
+- DeviceDataManagerSimpleCdaActuationTest (GDA-10-003)
 
-Please see the following links to access exercises, errata / clarifications, and the e-book:
- - [Programming the IoT Kanban Board](https://github.com/orgs/programming-the-iot/projects/1)
- - [Errata and Clarifications](https://labbenchstudios.com/programming-the-iot-book/programming-the-iot-1st-edition/)
- - [Programming the Internet of Things Book](https://learning.oreilly.com/library/view/programming-the-internet/9781492081401/)
+## How It Works
 
-## How to use this repository
-If you're reading [Programming the Internet of Things: An Introduction to Building Integrated, Device to Cloud IoT Solutions](https://learning.oreilly.com/library/view/programming-the-internet/9781492081401), you'll see a tie-in with the exercises described in each chapter and this repository. Most of the code in the main src tree is NOT implemented by design. It's intended for you - as the reader of my book (and possibly a student in one of my IoT courses) - to implement by filling in the implementation details as you work through each exercise.
+### MqttClientConnector (GDA-10-001, GDA-10-002)
+- Added TLS support using SimpleCertManagementUtil with server.crt certificate
+- initClientParameters() loads all config including enableCrypt, pemFileName, useAsyncClient
+- initSecureConnectionParameters() sets up SSLSocketFactory and switches to port 8883
+- initCredentialConnectionParameters() loads credentials from credFile if present
+- Switched from synchronous MqttClient to asynchronous MqttAsyncClient
+- connectComplete() callback subscribes to CDA topics with dedicated listener classes:
+  - ActuatorResponseMessageListener: handles ActuatorData response messages
+  - SensorDataMessageListener: handles SensorData messages from CDA
+  - SystemPerformanceDataMessageListener: handles SystemPerformanceData messages
+- All subscriptions moved from DeviceDataManager.startManager() to connectComplete()
 
-A solution set is available, although I haven't yet released it. Stay tuned for updates on this topic.
+### DeviceDataManager (GDA-10-003)
+- Added humidity threshold class-scoped variables:
+  - latestHumidifierActuatorData, latestHumiditySensorData, latestHumiditySensorTimeStamp
+  - handleHumidityChangeOnDevice, triggerHumidifierFloor, triggerHumidifierCeiling
+  - nominalHumiditySetting, humidityMaxTimePastThreshold
+- handleSensorMessage() invokes handleIncomingDataAnalysis() and handleUpstreamTransmission()
+- handleIncomingDataAnalysis() routes humidity data to handleHumiditySensorAnalysis()
+- handleHumiditySensorAnalysis() tracks threshold crossings over time:
+  - If humidity < floor for > humidityMaxTimePastThreshold seconds: send HVAC ON to CDA
+  - If humidity returns to nominal: send HVAC OFF to CDA
+- sendActuatorCommandtoCda() publishes ActuatorData to CDA_ACTUATOR_CMD_RESOURCE via MQTT
+- handleUpstreamTransmission() logs TODO for future cloud service integration
 
-## This repository aligns to exercises in Programming the Internet of Things
-These components are all written in Java 11 (or higher), and correlate to the exercises designed for the Gateway Device Application (GDA) specified in my book [Programming the Internet of Things: An Introduction to Building Integrated, Device to Cloud IoT Solutions](https://learning.oreilly.com/library/view/programming-the-internet/9781492081401).
+### TLS Configuration (CFG-10-001)
+- Generated CA and server certificates using openssl
+- Configured Mosquitto with TLS on port 8883
+- Copied server.crt to gda-java-components/certs/
+- Updated PiotConfig.props with absolute cert path and enableCrypt = True
 
-## How to navigate the directory structure for this repository
-This repository is comprised of the following top level paths:
-- [config](https://github.com/programming-the-iot/gda-java-components/tree/default/config): Contains basic configuration file(s).
-- [src](https://github.com/programming-the-iot/gda-java-components/tree/default/src): Contains the following source trees:
-  - [src/main/java](https://github.com/programming-the-iot/gda-java-components/tree/default/src/main/java): The main source tree for gda-java-components. Keep in mind that most of these classes are shell representations ONLY and must be implemented as part of the exercises referenced above.
-  - [src/test/java](https://github.com/programming-the-iot/gda-java-components/tree/default/src/test/java): The test source tree for gda-java-components. These are designed to perform very basic unit and integration testing of the implementation of the exercises referenced above. This tree is sectioned by part - part01, part02, part03, and part04 - which correspond to the structure of Programming the Internet of Things.
+## Testing
 
-Here are some other files at the top level that are important to review:
-- [pom.xml](https://github.com/programming-the-iot/gda-java-components/blob/default/pom.xml): The Maven project configuration file, with relevant depedencies, etc.
-- [README.md](https://github.com/programming-the-iot/gda-java-components/blob/default/README.md): This README.me file.
-- [LICENSE](https://github.com/programming-the-iot/gda-java-components/blob/default/LICENSE): The repository's LICENSE file.
+    # Terminal 1 - Start Mosquitto (TLS enabled)
+    sudo mosquitto -c /etc/mosquitto/mosquitto.conf
 
-Lastly, here are some 'dot' ('.{filename}') files pertaining to dev environment setup that you may find useful (or not - if so, just delete them after cloning the repo):
-- [.classpath](https://github.com/programming-the-iot/gda-java-components/blob/default/.classpath): The Eclipse IDE CLASSPATH configuration file for your Java environment that may / may not be useful for your own cloned instance.
-- [.gitignore](https://github.com/programming-the-iot/gda-java-components/blob/default/.gitignore): The obligatory .gitignore that you should probably keep in place, with any additions that are relevant for your own cloned instance.
-- [.project](https://github.com/programming-the-iot/gda-java-components/blob/default/.project): The Eclipse IDE project configuration file that may / may not be useful for your own cloned instance. Note that using this file to help create your Eclipse IDE project will result in the project name 'piot-gda-java-components' (which can be changed, of course).
-- [.settings/org.eclipse.jdt.core.prefs](https://github.com/programming-the-iot/gda-java-components/blob/default/.settings/org.eclipse.jdt.core.prefs): The Eclipse IDE settings file, which is only included to assist with setting up an Eclipse dev environment related to my IoT courses and book exercises, which may / may not be useful for your own cloned instance.
+    # Terminal 2 - Start GDA
+    cd ~/IoT_labs_TELE6530/gda-java-components
+    java -jar target/gateway-device-app-0.0.1-jar-with-dependencies.jar
 
-NOTE: The directory structure and all files are subject to change based on feedback I receive from readers of my book and students in my IoT class, as well as improvements I find to be helpful for overall repo betterment.
+    # Terminal 3 - Start CDA
+    cd ~/IoT_labs_TELE6530
+    source venv/bin/activate
+    python -m programmingtheiot.cda.app.ConstrainedDeviceApp
 
-# Other things to know
+    # Run MQTT performance tests (INT-10-001)
+    mvn test -Dtest=MqttClientPerformanceTest -pl .
 
-## Pull requests
-PR's are disabled while the codebase is being developed.
+    # Run CoAP performance tests (INT-10-002)
+    mvn test -Dtest=CoapClientPerformanceTest -pl .
 
-## Updates
-Much of this repository, and in particular unit and integration tests, will continue to evolve, so please check back regularly for potential updates. Please note that API changes can - and likely will - occur at any time.
+    # Run MQTT connector test (GDA-10-001, GDA-10-002)
+    mvn test -Dtest=MqttClientConnectorTest -pl .
 
-# REFERENCES
-This repository has external dependencies on other open source projects. I'm grateful to the open source community and authors / maintainers of the following libraries:
+    # Run humidity actuation test (GDA-10-003)
+    mvn test -Dtest=DeviceDataManagerSimpleCdaActuationTest -pl .
 
-Lab Module Library References (not all are required for each lab module):
+## Tests Passed
 
-- [aws-iot-device-sdk-java](https://github.com/aws/aws-iot-device-sdk-java)
-  - Reference: AWS. AWS IoT Device SDK (Java). (2023) [Online]. Available: https://github.com/aws/aws-iot-device-sdk-java.
-- [aws-iot-device-sdk-java-samples](https://github.com/aws/aws-iot-device-sdk-java)
-  - Reference: AWS. AWS IoT Device SDK Samples (Java). (2023) [Online]. Available: https://github.com/aws/aws-iot-device-sdk-java.
-- [azure-iot-device-client](https://github.com/Azure/azure-iot-sdk-java)
-  - Reference: Microsoft. Azure IoT Device Client (Java). (2023) [Online]. Available: https://github.com/Azure/azure-iot-sdk-java.
-- [californium-core](https://github.com/eclipse/californium)
-  - Reference: Eclipse Foundation, Inc. Californium (Cf) - CoAP for Java. (2020) [Online]. Available. https://github.com/eclipse/californium.
-- [californium/scandium-core](https://github.com/eclipse/californium/tree/master/scandium-core)
-  - Reference: Eclipse Foundation, Inc. Scandium (Sc) - Security for Californium. (2021) [Online]. Available. https://github.com/eclipse/californium/tree/master/scandium-core.
-- [commons-cli](https://commons.apache.org/proper/commons-cli/)
-  - Reference: The Apache Software Foundation. Commons CLI. (2019) [Online]. Available. https://commons.apache.org/proper/commons-cli/.
-- [commons-configuration2](commons.apache.org/proper/commons-configuration/)
-  - Reference: The Apache Software Foundation. Commons Configuration 2. (2023) [Online]. Available: https://commons.apache.org/proper/commons-configuration/.
-- [org.eclipse.paho.client.mqttv3](https://www.eclipse.org/paho/)
-  - Reference: Eclipse Foundation, Inc. Eclipse Paho Java Client. (2020) [Online]. Available: https://github.com/eclipse/paho.mqtt.java.
-- [org.eclipse.paho.mqttv5.client](https://www.eclipse.org/paho/)
-  - Reference: Eclipse Foundation, Inc. Eclipse Paho Java Client. (2023) [Online]. Available: https://github.com/eclipse/paho.mqtt.java.
-- [gson](https://github.com/google/gson)
-  - Reference: Google. Gson. (2008) [Online]. Available: https://github.com/google/gson.
-- [influxdb-client-java](https://github.com/influxdata/influxdb-client-java)
-  - Reference: Influx Data, Inc. Influx DB. (2023) [Online]. Available: https://github.com/influxdata/influxdb-client-java.
-- [jakarta.mail-api](https://jakartaee.github.io/mail-api/)
-  - Reference: Eclipse Foundation, Inc. Jakarta Mail. (2023) [Online]. Available: https://github.com/jakartaee/mail-api.
-- [jedis](https://github.com/redis/jedis)
-  - Reference: J. Leibiusky. Jedis. (2020) [Online]. Available: https://github.com/redis/jedis.
-- [junit](https://github.com/junit-team/junit4/)
-  - Reference: JUnit. JUnit 4. (2020) [Online]. Available: https://junit.org/junit4/.
+| Task | Test | Result |
+|------|------|--------|
+| PIOT-INT-10-001 | MQTT Performance - Connect/Disconnect | PASSED |
+| PIOT-INT-10-001 | MQTT Performance - QoS 0 (10,000 msgs) | PASSED |
+| PIOT-INT-10-001 | MQTT Performance - QoS 1 (10,000 msgs) | PASSED |
+| PIOT-INT-10-001 | MQTT Performance - QoS 2 (10,000 msgs) | PASSED |
+| PIOT-INT-10-002 | CoAP Performance - POST NON (10,000 msgs) | PASSED |
+| PIOT-INT-10-002 | CoAP Performance - POST CON (10,000 msgs) | PASSED |
+| PIOT-GDA-10-001 | MqttClientConnector TLS + auth support | PASSED |
+| PIOT-GDA-10-002 | MqttClientConnector async + listener classes | PASSED |
+| PIOT-GDA-10-003 | DeviceDataManager humidity actuation logic | PASSED |
+| PIOT-INT-10-003 | CDA↔GDA MQTT integration (no TLS) | PASSED |
+| PIOT-INT-10-004 | CDA↔GDA MQTT integration (TLS port 8883) | PASSED |
 
-NOTE: This list will be updated as other libraries / dependencies are incorporated.
+## GDA MQTT Client Performance Test Results (PIOT-STU-10-002)
 
-# FAQ
-For typical questions (and answers) to the repositories of the Programming the IoT project, please see the [FAQ](https://github.com/programming-the-iot/book-exercise-tasks/blob/default/FAQ.md).
+Tests run with 10,000 messages against local Mosquitto broker (localhost:1883).
+NOTE: Used synchronous MqttClient for performance tests (not MqttAsyncClient) per INT-10-001 requirements.
 
-# IMPORTANT NOTES
-This code base is under active development.
+### Connect/Disconnect
+    INFO: Connect and Disconnect [1]: 321 ms
 
-If  any  code  samples  or  other  technology  this  work  contains, describes, and / or is  subject  to  open  source licenses  or  the  intellectual  property  rights  of  others,  it  is  your  responsibility  to  ensure  that  your  use thereof complies with such licenses and/or rights.
+### QoS 0 — 10,000 messages
+    INFO: Publish message - QoS 0 [10000]: 12616 ms
 
-# LICENSE
-Please see [LICENSE](https://github.com/programming-the-iot/gda-java-components/blob/default/LICENSE) if you plan to use this code.
+### QoS 1 — 10,000 messages
+    INFO: Publish message - QoS 1 [10000]: 18931 ms
 
-Please refer to the referenced libraries for their respective licenses.
+### QoS 2 — 10,000 messages
+    INFO: Publish message - QoS 2 [10000]: 30161 ms
+
+| QoS Level | Time (ms) | vs QoS 0 Baseline |
+|-----------|-----------|-------------------|
+| QoS 0 | 12,616 ms | baseline |
+| QoS 1 | 18,931 ms | +50% slower |
+| QoS 2 | 30,161 ms | +139% slower |
+
+- Fastest: QoS 0 (fire and forget, no acknowledgment)
+- Slowest: QoS 2 (4-step handshake per message)
+
+## GDA CoAP Client Performance Test Results (PIOT-STU-10-002)
+
+Tests run with 10,000 messages against local GDA CoAP server (localhost:5683).
+
+### POST NON — 10,000 messages
+    INFO: POST message - useCON = false [10000]: 24101 ms
+
+### POST CON — 10,000 messages
+    INFO: POST message - useCON = true [10000]: 22755 ms
+
+| Message Type | Time (ms) | vs NON Baseline |
+|--------------|-----------|-----------------|
+| NON | 24,101 ms | baseline |
+| CON | 22,755 ms | -5.6% (CON faster) |
+
+- Fastest: CON (flow control more efficient on loopback)
+- Slowest: NON
+- Note: CON was slightly faster than NON because on local loopback, acknowledgments are near-instant and CON flow control can be more efficient than NON retransmit handling.
+
+## Integration Test Results
+
+### PIOT-INT-10-003 — CDA↔GDA MQTT (No TLS)
+- GDA received sensor messages from CDA via MQTT:
+    INFO: MQTT message arrived on topic: 'PIOT/ConstrainedDevice/SensorMsg'
+    INFO: MQTT message arrived on topic: 'PIOT/ConstrainedDevice/SystemPerfMsg'
+    INFO: POST request received for resource: SensorMsg
+    INFO: POST request received for resource: SystemPerfMsg
+- Both applications ran for 5+ minutes without errors
+- Clean shutdown confirmed
+
+### PIOT-INT-10-004 — CDA↔GDA MQTT (TLS Encrypted)
+- Mosquitto confirmed TLS connection on port 8883:
+    1777661156: New connection from 127.0.0.1:33179 on port 8883.
+- GDA connected via TLS using server.crt certificate
+- All MQTT messages encrypted in transit
+- Wireshark confirmed TLS handshake on loopback adapter
+
+## Wireshark MQTT Protocol Output (PIOT-INT-10-003)
+
+### MQTT CONNECT (No TLS - Port 1883)
+    Message Type: Connect Command (1)
+    Protocol Name: MQTT
+    Protocol Level: 4 (MQTT 3.1.1)
+    Connect Flags: 0x02
+    Keep Alive: 60
+    Client ID: gatewaydevice001
+
+### MQTT SUBSCRIBE - CDA Topics
+    Message Type: Subscribe Request (8)
+    Topics:
+      - PIOT/ConstrainedDevice/ActuatorResponse (QoS 1)
+      - PIOT/ConstrainedDevice/SensorMsg (QoS 1)
+      - PIOT/ConstrainedDevice/SystemPerfMsg (QoS 1)
+
+### MQTT PUBLISH - Actuator Command to CDA
+    Message Type: Publish Message (3)
+    Topic: PIOT/ConstrainedDevice/ActuatorCmd
+    QoS Level: At most once delivery (Fire and Forget) (0)
+    Payload: {"typeID": 1001, "command": 1, "name": "HVAC", "value": 40.0}
+
+### MQTT TLS Handshake (Port 8883)
+    Transport Layer Security
+      TLSv1.3 Record Layer: Handshake Protocol: Client Hello
+      TLSv1.3 Record Layer: Handshake Protocol: Server Hello
+      TLSv1.3 Record Layer: Change Cipher Spec Protocol
+      TLSv1.3 Record Layer: Application Data Protocol: mqtt
+
+## Summary
+Lab Module 10 added intelligent edge messaging between the GDA and CDA using MQTT and CoAP. The GDA now uses an asynchronous MQTT client with dedicated inner listener classes for SensorData, SystemPerformanceData, and ActuatorData response messages. TLS-encrypted MQTT connections are supported on port 8883. The DeviceDataManager implements humidity threshold analysis and publishes actuation commands to the CDA when thresholds are exceeded. Performance testing confirmed QoS 0 is fastest for MQTT and CON was marginally faster than NON for CoAP on local loopback. All 11 tasks passed successfully.
