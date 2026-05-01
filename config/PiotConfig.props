@@ -11,18 +11,17 @@
 # Cloud client configuration information
 #
 [Cloud.GatewayService]
-credFile       = ./cred/PiotCloudCred.props
-certFile       = ./cert/PiotCloudCert.pem
-host           = localhost
+credFile       = /home/nawaf/IoT_labs_TELE6530/cred/UbidotsCloudCred.props
+certFile       = /home/nawaf/IoT_labs_TELE6530/certs/UbidotsCloudCert.pem
+host           = industrial.api.ubidots.com
 port           = 1883
 securePort     = 8883
 defaultQoS     = 0
-keepAlive      = 60
-useAsyncClient = True
+keepAlive      = 30
 enableAuth     = True
 enableCrypt    = True
-baseUrl        = 
-baseTopic      = 
+baseUrl        = https://things.ubidots.com/api/v1.6/
+baseTopic      = /v1.6/devices/ 
 
 #
 # SMTP client configuration information
@@ -73,7 +72,7 @@ pollCycleSecs           = 60
 enableMqttClient        = True
 enableCoapServer        = True
 enableCoapClient        = True
-enableCloudClient       = False
+enableCloudClient       = True
 enableSmtpClient        = False
 enablePersistenceClient = False
 enableSystemPerformance = False
@@ -86,4 +85,5 @@ handleHumidityChangeOnDevice = True
 humidityMaxTimePastThreshold = 10
 nominalHumiditySetting       = 40.0
 triggerHumidifierFloor       = 30.0
-triggerHumidifierCeiling     = 50.0
+triggerHumidifierCeiling     = 50.0 
+

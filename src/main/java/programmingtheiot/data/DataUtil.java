@@ -1,14 +1,3 @@
-/**
- * This class is part of the Programming the Internet of Things
- * project, and is available via the MIT License, which can be
- * found in the LICENSE file at the top level of this repository.
- * 
- * You may find it more helpful to your design to adjust the
- * functionality, constants and interfaces (if there are any)
- * provided within in order to meet the needs of your specific
- * Programming the Internet of Things project.
- */
-
 package programmingtheiot.data;
 
 import java.nio.file.FileSystems;
@@ -59,13 +48,14 @@ public class DataUtil
 		return jsonData;
 	}
 
-	public String actuatorDataToTimeAndValueJson(ActuatorData actuatorData)
+	public String actuatorDataToTimeAndValueJson(ActuatorData data)
 	{
 		String jsonData = null;
 
-		if (actuatorData != null) {
+		if (data != null) {
 			Gson gson = new Gson();
-			jsonData = gson.toJson(actuatorData);
+			TimeAndValuePayloadData tvData = new TimeAndValuePayloadData(data);
+			jsonData = gson.toJson(tvData);
 			_Logger.info("ActuatorData to TimeAndValue JSON: " + jsonData);
 		}
 
@@ -85,13 +75,14 @@ public class DataUtil
 		return jsonData;
 	}
 
-	public String sensorDataToTimeAndValueJson(SensorData sensorData)
+	public String sensorDataToTimeAndValueJson(SensorData data)
 	{
 		String jsonData = null;
 
-		if (sensorData != null) {
+		if (data != null) {
 			Gson gson = new Gson();
-			jsonData = gson.toJson(sensorData);
+			TimeAndValuePayloadData tvData = new TimeAndValuePayloadData(data);
+			jsonData = gson.toJson(tvData);
 			_Logger.info("SensorData to TimeAndValue JSON: " + jsonData);
 		}
 
@@ -176,5 +167,4 @@ public class DataUtil
 		return data;
 	}
 
-} 
-
+}
