@@ -1,96 +1,161 @@
-# Programming the IoT - GDA Java Components
-This is the source repository for the Java components related to my Programming the Internet of Things book and Connected Devices IoT course. These are shell wrappers ONLY and are not a solution set (which is a separate repository, not yet released). For convenience to the reader, some basic functionality has already been implemented (such as configuration logic, consts, interfaces, a simple certificate file load utility, and test cases).
+=========================
+📄 Project README — Lab Module 12
+=========================
 
-The code in this repository is largely comprised of shell classes that are designed to be implemented by the reader and are NOT solutions. These shell classes and their relationships respresent a notional design that aligns with the requirements listed in [Programming the IoT Requirements](https://github.com/orgs/programming-the-iot/projects/1). These requirements encapsulate the programming exercises presented in my book [Programming the Internet of Things: An Introduction to Building Integrated, Device to Cloud IoT Solutions](https://learning.oreilly.com/library/view/programming-the-internet/9781492081401).
+## Overview
 
-## Links, Exercises, Updates, Errata, and Clarifications
+In Lab Module 12, I implemented the semester project across both the Constrained Device Application (CDA) and Gateway Device Application (GDA) — a Petrochemical Facility Air Quality and Worker Safety Monitoring System. The CDA now simulates three hazardous gas sensors (CO, H2S, VOC) and activates a ventilation actuator when dangerous thresholds are exceeded. The GDA forwards all 9 sensor variables to the Ubidots cloud dashboard via secure MQTT/TLS, and routes actuation commands back down to the CDA.
 
-Please see the following links to access exercises, errata / clarifications, and the e-book:
- - [Programming the IoT Kanban Board](https://github.com/orgs/programming-the-iot/projects/1)
- - [Errata and Clarifications](https://labbenchstudios.com/programming-the-iot-book/programming-the-iot-1st-edition/)
- - [Programming the Internet of Things Book](https://learning.oreilly.com/library/view/programming-the-internet/9781492081401/)
+---
 
-## How to use this repository
-If you're reading [Programming the Internet of Things: An Introduction to Building Integrated, Device to Cloud IoT Solutions](https://learning.oreilly.com/library/view/programming-the-internet/9781492081401), you'll see a tie-in with the exercises described in each chapter and this repository. Most of the code in the main src tree is NOT implemented by design. It's intended for you - as the reader of my book (and possibly a student in one of my IoT courses) - to implement by filling in the implementation details as you work through each exercise.
+## What I Implemented
 
-A solution set is available, although I haven't yet released it. Stay tuned for updates on this topic.
+### CDA — New Sensor Simulation
+- CoSensorSimTask
+- H2sSensorSimTask
+- VocSensorSimTask
 
-## This repository aligns to exercises in Programming the Internet of Things
-These components are all written in Java 11 (or higher), and correlate to the exercises designed for the Gateway Device Application (GDA) specified in my book [Programming the Internet of Things: An Introduction to Building Integrated, Device to Cloud IoT Solutions](https://learning.oreilly.com/library/view/programming-the-internet/9781492081401).
+### CDA — New Actuator Simulation
+- VentilationActuatorSimTask
 
-## How to navigate the directory structure for this repository
-This repository is comprised of the following top level paths:
-- [config](https://github.com/programming-the-iot/gda-java-components/tree/default/config): Contains basic configuration file(s).
-- [src](https://github.com/programming-the-iot/gda-java-components/tree/default/src): Contains the following source trees:
-  - [src/main/java](https://github.com/programming-the-iot/gda-java-components/tree/default/src/main/java): The main source tree for gda-java-components. Keep in mind that most of these classes are shell representations ONLY and must be implemented as part of the exercises referenced above.
-  - [src/test/java](https://github.com/programming-the-iot/gda-java-components/tree/default/src/test/java): The test source tree for gda-java-components. These are designed to perform very basic unit and integration testing of the implementation of the exercises referenced above. This tree is sectioned by part - part01, part02, part03, and part04 - which correspond to the structure of Programming the Internet of Things.
+### CDA — Updated Managers
+- SensorAdapterManager
+- ActuatorAdapterManager
+- DeviceDataManager
 
-Here are some other files at the top level that are important to review:
-- [pom.xml](https://github.com/programming-the-iot/gda-java-components/blob/default/pom.xml): The Maven project configuration file, with relevant depedencies, etc.
-- [README.md](https://github.com/programming-the-iot/gda-java-components/blob/default/README.md): This README.me file.
-- [LICENSE](https://github.com/programming-the-iot/gda-java-components/blob/default/LICENSE): The repository's LICENSE file.
+### CDA — Updated Constants
+- ConfigConst (new gas sensor types, names, thresholds)
 
-Lastly, here are some 'dot' ('.{filename}') files pertaining to dev environment setup that you may find useful (or not - if so, just delete them after cloning the repo):
-- [.classpath](https://github.com/programming-the-iot/gda-java-components/blob/default/.classpath): The Eclipse IDE CLASSPATH configuration file for your Java environment that may / may not be useful for your own cloned instance.
-- [.gitignore](https://github.com/programming-the-iot/gda-java-components/blob/default/.gitignore): The obligatory .gitignore that you should probably keep in place, with any additions that are relevant for your own cloned instance.
-- [.project](https://github.com/programming-the-iot/gda-java-components/blob/default/.project): The Eclipse IDE project configuration file that may / may not be useful for your own cloned instance. Note that using this file to help create your Eclipse IDE project will result in the project name 'piot-gda-java-components' (which can be changed, of course).
-- [.settings/org.eclipse.jdt.core.prefs](https://github.com/programming-the-iot/gda-java-components/blob/default/.settings/org.eclipse.jdt.core.prefs): The Eclipse IDE settings file, which is only included to assist with setting up an Eclipse dev environment related to my IoT courses and book exercises, which may / may not be useful for your own cloned instance.
+### GDA — Updated Connection
+- CloudClientConnector (fixed async connection timing + connection guard)
 
-NOTE: The directory structure and all files are subject to change based on feedback I receive from readers of my book and students in my IoT class, as well as improvements I find to be helpful for overall repo betterment.
+### Cloud — Ubidots Dashboard
+- 9 live variables streaming every 5 seconds
+- Gas gauges, thermometer, tank, charts, indicator, switch
 
-# Other things to know
+---
 
-## Pull requests
-PR's are disabled while the codebase is being developed.
+## How It Works
 
-## Updates
-Much of this repository, and in particular unit and integration tests, will continue to evolve, so please check back regularly for potential updates. Please note that API changes can - and likely will - occur at any time.
+The system follows a full three-tier data pipeline:
 
-# REFERENCES
-This repository has external dependencies on other open source projects. I'm grateful to the open source community and authors / maintainers of the following libraries:
+**Edge tier (CDA):**
+- Gas sensors generate simulated values every 5 seconds
+- SensorAdapterManager collects all sensor data
+- DeviceDataManager processes the data
+- Decision logic checks gas thresholds
+- ActuatorAdapterManager sends ventilation commands
+- VentilationActuator executes ON/OFF
 
-Lab Module Library References (not all are required for each lab module):
+**Gateway tier (GDA):**
+- MqttClientConnector receives data from local broker
+- DeviceDataManager routes data to cloud
+- CloudClientConnector forwards to Ubidots via TLS
+- Actuation commands from Ubidots routed back to CDA
 
-- [aws-iot-device-sdk-java](https://github.com/aws/aws-iot-device-sdk-java)
-  - Reference: AWS. AWS IoT Device SDK (Java). (2023) [Online]. Available: https://github.com/aws/aws-iot-device-sdk-java.
-- [aws-iot-device-sdk-java-samples](https://github.com/aws/aws-iot-device-sdk-java)
-  - Reference: AWS. AWS IoT Device SDK Samples (Java). (2023) [Online]. Available: https://github.com/aws/aws-iot-device-sdk-java.
-- [azure-iot-device-client](https://github.com/Azure/azure-iot-sdk-java)
-  - Reference: Microsoft. Azure IoT Device Client (Java). (2023) [Online]. Available: https://github.com/Azure/azure-iot-sdk-java.
-- [californium-core](https://github.com/eclipse/californium)
-  - Reference: Eclipse Foundation, Inc. Californium (Cf) - CoAP for Java. (2020) [Online]. Available. https://github.com/eclipse/californium.
-- [californium/scandium-core](https://github.com/eclipse/californium/tree/master/scandium-core)
-  - Reference: Eclipse Foundation, Inc. Scandium (Sc) - Security for Californium. (2021) [Online]. Available. https://github.com/eclipse/californium/tree/master/scandium-core.
-- [commons-cli](https://commons.apache.org/proper/commons-cli/)
-  - Reference: The Apache Software Foundation. Commons CLI. (2019) [Online]. Available. https://commons.apache.org/proper/commons-cli/.
-- [commons-configuration2](commons.apache.org/proper/commons-configuration/)
-  - Reference: The Apache Software Foundation. Commons Configuration 2. (2023) [Online]. Available: https://commons.apache.org/proper/commons-configuration/.
-- [org.eclipse.paho.client.mqttv3](https://www.eclipse.org/paho/)
-  - Reference: Eclipse Foundation, Inc. Eclipse Paho Java Client. (2020) [Online]. Available: https://github.com/eclipse/paho.mqtt.java.
-- [org.eclipse.paho.mqttv5.client](https://www.eclipse.org/paho/)
-  - Reference: Eclipse Foundation, Inc. Eclipse Paho Java Client. (2023) [Online]. Available: https://github.com/eclipse/paho.mqtt.java.
-- [gson](https://github.com/google/gson)
-  - Reference: Google. Gson. (2008) [Online]. Available: https://github.com/google/gson.
-- [influxdb-client-java](https://github.com/influxdata/influxdb-client-java)
-  - Reference: Influx Data, Inc. Influx DB. (2023) [Online]. Available: https://github.com/influxdata/influxdb-client-java.
-- [jakarta.mail-api](https://jakartaee.github.io/mail-api/)
-  - Reference: Eclipse Foundation, Inc. Jakarta Mail. (2023) [Online]. Available: https://github.com/jakartaee/mail-api.
-- [jedis](https://github.com/redis/jedis)
-  - Reference: J. Leibiusky. Jedis. (2020) [Online]. Available: https://github.com/redis/jedis.
-- [junit](https://github.com/junit-team/junit4/)
-  - Reference: JUnit. JUnit 4. (2020) [Online]. Available: https://junit.org/junit4/.
+**Cloud tier (Ubidots):**
+- 9 variables update live every 5 seconds
+- Dashboard shows gauges, charts, indicators
+- Switch widget sends actuation commands back to CDA
 
-NOTE: This list will be updated as other libraries / dependencies are incorporated.
+**Example logic:**
 
-# FAQ
-For typical questions (and answers) to the repositories of the Programming the IoT project, please see the [FAQ](https://github.com/programming-the-iot/book-exercise-tasks/blob/default/FAQ.md).
+CDA threshold checks:
+- If CO > 35 ppm → Ventilation ON
+- If H2S > 1 ppm → Ventilation ON
+- If VOC > 200 index → Ventilation ON
+- If all gases safe → Ventilation OFF
 
-# IMPORTANT NOTES
-This code base is under active development.
+Gas spike simulation:
+- CO: 5% chance per poll → spikes to 80–250 ppm
+- H2S: 3% chance per poll → spikes to 10–75 ppm
+- VOC: 6% chance per poll → spikes to 280–480 index
 
-If  any  code  samples  or  other  technology  this  work  contains, describes, and / or is  subject  to  open  source licenses  or  the  intellectual  property  rights  of  others,  it  is  your  responsibility  to  ensure  that  your  use thereof complies with such licenses and/or rights.
+---
 
-# LICENSE
-Please see [LICENSE](https://github.com/programming-the-iot/gda-java-components/blob/default/LICENSE) if you plan to use this code.
+## Testing
 
-Please refer to the referenced libraries for their respective licenses.
+I tested the implementation step by step across CDA, GDA, and Cloud.
+
+**CDA — Sensor Simulation**
+```bash
+python -m pytest tests/unit/sim/test_CoSensorSimTask.py -q
+python -m pytest tests/unit/sim/test_H2sSensorSimTask.py -q
+python -m pytest tests/unit/sim/test_VocSensorSimTask.py -q
+```
+
+**CDA — Actuator Simulation**
+```bash
+python -m pytest tests/unit/sim/test_VentilationActuatorSimTask.py -q
+```
+
+**CDA — ActuatorAdapterManager**
+```bash
+python -m pytest tests/integration/system/test_ActuatorAdapterManager.py -q
+```
+
+**CDA — DeviceDataManager**
+```bash
+python -m pytest tests/integration/app/test_DeviceDataManagerNoComms.py -q
+```
+
+**CDA — Full Application**
+```bash
+python programmingtheiot/cda/app/ConstrainedDeviceApp.py
+```
+
+**GDA — CloudClientConnector**
+```bash
+cd gda-java-components
+mvn test -Dtest=CloudClientConnectorTest
+```
+
+**GDA — Full Application**
+```bash
+mvn exec:java -Dexec.mainClass="programmingtheiot.gda.app.GatewayDeviceApp"
+```
+
+**End-to-End — Full Pipeline**
+```bash
+# Terminal 1 — GDA
+cd ~/IoT_labs_TELE6530/gda-java-components
+mvn exec:java -Dexec.mainClass="programmingtheiot.gda.app.GatewayDeviceApp"
+
+# Terminal 2 — CDA
+cd ~/IoT_labs_TELE6530
+source venv/bin/activate
+export PYTHONPATH=/home/nawaf/IoT_labs_TELE6530
+python programmingtheiot/cda/app/ConstrainedDeviceApp.py
+```
+
+---
+
+## Test Results
+
+| Component | Test | Result |
+|---|---|---|
+| CDA | CO sensor polling and spike injection | ✅ PASSED |
+| CDA | H2S sensor polling and spike injection | ✅ PASSED |
+| CDA | VOC sensor polling and spike injection | ✅ PASSED |
+| CDA | Ventilation ON when CO > 35 ppm | ✅ PASSED |
+| CDA | Ventilation ON when H2S > 1 ppm | ✅ PASSED |
+| CDA | Ventilation ON when VOC > 200 | ✅ PASSED |
+| CDA | Ventilation OFF when all gases safe | ✅ PASSED |
+| CDA | All 6 sensors publishing to local MQTT | ✅ PASSED |
+| GDA | TLS connection to Ubidots:8883 | ✅ PASSED |
+| GDA | Cloud connects before data arrives | ✅ PASSED |
+| GDA | All 9 variables live in Ubidots | ✅ PASSED |
+| GDA | Actuation command forwarded to CDA | ✅ PASSED |
+| Cloud | Dashboard updating every 5 seconds | ✅ PASSED |
+
+---
+
+## Note
+
+The GDA required a fix to CloudClientConnector because MqttAsyncClient connects asynchronously — data was arriving before the connection was fully established causing Client is not connected (32104) errors on every publish. A retry wait loop and connection guard were added to resolve this. The Ubidots API Key was also replaced with the correct Token in the credentials file — the API Key cannot be used for MQTT authentication.
+
+---
+
+## Summary
+
+This lab implemented the full semester project — a Petrochemical Facility Air Quality and Worker Safety Monitoring System. The CDA now generates simulated gas sensor data with probabilistic spike events that simulate real leak scenarios, processes it locally with threshold logic, and automatically activates emergency ventilation when dangerous levels are detected. The GDA forwards all 9 sensor variables securely to the Ubidots cloud dashboard every 5 seconds where live gauges, charts, and indicators give supervisors complete real-time visibility. The architecture is designed so that replacing simulated sensors with real physical gas detectors requires only minimal changes — making this a credible, deployable foundation for real worker safety at petrochemical facilities like SABIC, Dow Chemical, or Saudi Aramco.
