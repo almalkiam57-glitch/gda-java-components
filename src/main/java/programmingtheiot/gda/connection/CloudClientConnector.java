@@ -56,7 +56,28 @@ public class CloudClientConnector implements ICloudClient, IConnectionListener
 			this.mqttClient.setConnectionListener(this);
 		}
 
-		return this.mqttClient.connectClient();
+		boolean result = this.mqttClient.connectClient();
+
+		// Wait up to 5 seconds for async connection to complete
+		int retries = 0;
+		while (! this.mqttClient.isConnected() && retries < 10) {
+			try {
+				_Logger.info("Waiting for cloud MQTT connection... attempt " + (retries + 1));
+				Thread.sleep(500);
+				retries++;
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				break;
+			}
+		}
+
+		if (this.mqttClient.isConnected()) {
+			_Logger.info("Cloud MQTT client connected successfully to Ubidots.");
+			return true;
+		} else {
+			_Logger.severe("Cloud MQTT client failed to connect after retries.");
+			return false;
+		}
 	}
 
 	@Override
@@ -170,9 +191,6 @@ public class CloudClientConnector implements ICloudClient, IConnectionListener
 		LedEnablementMessageListener ledListener =
 			new LedEnablementMessageListener(this.dataMsgListener);
 
-		// Publish an initial invalid response to create the topic on the cloud service
-		// if it doesn't already exist. The invalid value (-1) ensures it won't trigger
-		// any actuation on the CDA.
 		ActuatorData ad = new ActuatorData();
 		ad.setAsResponse();
 		ad.setName(ConfigConst.LED_ACTUATOR_NAME);
@@ -185,7 +203,6 @@ public class CloudClientConnector implements ICloudClient, IConnectionListener
 
 		this.publishMessageToCloud(ledTopic, adJson);
 
-		// Subscribe to LED actuation topic from cloud
 		this.mqttClient.subscribeToTopic(ledTopic, this.qosLevel, ledListener);
 
 		_Logger.info("Subscribed to LED actuation topic: " + ledTopic);
@@ -233,8 +250,14 @@ public class CloudClientConnector implements ICloudClient, IConnectionListener
 
 	private boolean publishMessageToCloud(String topicName, String payload)
 	{
+		// Check connection before attempting to publish
+		if (this.mqttClient == null || ! this.mqttClient.isConnected()) {
+			_Logger.warning("Cloud MQTT client not connected. Skipping publish to: " + topicName);
+			return false;
+		}
+
 		try {
-			_Logger.finest("Publishing payload to cloud: " + topicName);
+			_Logger.info("Publishing to Ubidots topic: " + topicName);
 			this.mqttClient.publishMessage(topicName, payload.getBytes(), this.qosLevel);
 			return true;
 		} catch (Exception e) {
@@ -312,4 +335,5 @@ public class CloudClientConnector implements ICloudClient, IConnectionListener
 		}
 	}
 
-}
+} 
+
