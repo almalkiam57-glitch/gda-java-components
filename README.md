@@ -72,9 +72,13 @@ I implemented/updated the following components:
  
   Terminal 1 — Mosquitto
 bashsudo mosquitto -c /etc/mosquitto/mosquitto.conf
+
+
 Terminal 2 — GDA
 bashcd /home/nawaf/IoT_labs_TELE6530/gda-java-components
-mvn test -Dtest=CloudClientConnectorTest -Dsurefire.failIfNoSpecifiedTests=false
+mvn test -Dtest=CloudClientConnectorTest -Dsurefire.failIfNoSpecifiedTests=false 
+
+
 Terminal 3 — CDA
 bashcd /home/nawaf/IoT_labs_TELE6530
 source venv/bin/activate
